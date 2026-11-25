@@ -39,6 +39,7 @@ class OnChainMetrics:
     description: Optional[str] = None
     official_url: Optional[str] = None
     chains: List[str] = field(default_factory=list)
+    chain_tvls: Dict[str, float] = field(default_factory=dict)
     tvl_usd: Optional[float] = None
     tvl_change_1d: Optional[float] = None
     tvl_change_7d: Optional[float] = None
@@ -169,6 +170,28 @@ class DefiLlamaClient:
                 if isinstance(detail, dict):
                     if detail.get("description"):
                         metrics.description = str(detail["description"])
+                    current_chain_tvls = detail.get("currentChainTvls")
+                    if isinstance(current_chain_tvls, dict):
+                        skip_suffixes = ("-borrowed", "-staking", "-pool2", "-vesting", "-offers", "-treasury")
+                        skip_names = {"borrowed", "staking", "pool2", "vesting", "offers", "treasury"}
+                        clean_ctvls: Dict[str, float] = {}
+                        for cname, cval in current_chain_tvls.items():
+                            low_c = str(cname).lower()
+                            if low_c in skip_names or any(low_c.endswith(s) for s in skip_suffixes):
+                                continue
+                            try:
+                                fval = float(cval)
+                                if fval > 0:
+                                    clean_ctvls[str(cname)] = round(fval, 2)
+                            except (TypeError, ValueError):
+                                continue
+                        # Sort descending by TVL
+                        metrics.chain_tvls = dict(
+                            sorted(clean_ctvls.items(), key=lambda kv: kv[1], reverse=True)
+                        )
+                        for cname in metrics.chain_tvls:
+                            if cname not in metrics.chains:
+                                metrics.chains.append(cname)
                     if detail.get("audits"):
                         try:
                             metrics.audits_count = int(detail["audits"])

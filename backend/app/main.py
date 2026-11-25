@@ -135,6 +135,7 @@ def list_projects(
             if needle in (p.name or "").lower()
             or needle in (p.category or "").lower()
             or needle in (p.url or "").lower()
+            or any(needle in str(c).lower() for c in (p.chains or []))
         ]
 
     items: List[ProjectListItem] = []
@@ -145,6 +146,10 @@ def list_projects(
                 name=p.name,
                 slug=p.slug,
                 url=p.url,
+                docs_url=p.docs_url,
+                twitter_url=p.twitter_url,
+                telegram_url=p.telegram_url,
+                instagram_url=p.instagram_url,
                 category=p.category,
                 chains=p.chains or [],
                 tvl_usd=p.tvl_usd,
@@ -219,9 +224,48 @@ async def analyze_project(
     project.twitter_url = scraped.twitter_url or onchain.defillama_twitter
     project.discord_url = scraped.discord_url
     project.telegram_url = scraped.telegram_url
+    project.instagram_url = scraped.instagram_url
+
+    # Build complete deduplicated attachment of all linked project channels
+    eco_links: List[dict] = []
+    seen_eco: set[str] = set()
+
+    def _add_eco(label: str, kind: str, link_url: Optional[str]) -> None:
+        if not link_url:
+            return
+        clean = link_url.strip().rstrip("/")
+        if clean and clean.lower() not in seen_eco:
+            seen_eco.add(clean.lower())
+            eco_links.append({"label": label, "type": kind, "url": link_url.strip()})
+
+    _add_eco("Site Oficial", "website", onchain.official_url or normalized)
+    if onchain.official_url and normalize_url(onchain.official_url) != normalized:
+        _add_eco("App / dApp", "app", normalized)
+    _add_eco("X (Twitter)", "twitter", project.twitter_url)
+    _add_eco("Telegram", "telegram", project.telegram_url)
+    _add_eco("Instagram", "instagram", project.instagram_url)
+    _add_eco("Discord", "discord", project.discord_url)
+    _add_eco("GitHub", "github", project.github_url)
+    _add_eco("Documentação / Docs", "docs", project.docs_url)
+    _add_eco("Roadmap", "roadmap", scraped.roadmap_url)
+    if onchain.slug:
+        _add_eco("DefiLlama", "analytics", f"https://defillama.com/protocol/{onchain.slug}")
+    for idx, audit_u in enumerate(onchain.audit_links[:4], start=1):
+        _add_eco(f"Auditoria #{idx}", "audit", audit_u)
+    for extra in scraped.extra_links:
+        _add_eco(extra["label"], extra["type"], extra["url"])
+
+    project.ecosystem_links = eco_links
+
+    # Merge DefiLlama chains + detected chains from website/docs text
+    merged_chains = list(onchain.chains)
+    for ch in scraped.detected_chains:
+        if ch not in merged_chains:
+            merged_chains.append(ch)
 
     project.category = report.category or onchain.category
-    project.chains = onchain.chains
+    project.chains = merged_chains
+    project.chain_tvls = onchain.chain_tvls
     project.tvl_usd = onchain.tvl_usd
     project.tvl_change_7d = onchain.tvl_change_7d
     project.funding_usd = onchain.total_funding_usd
@@ -279,6 +323,8 @@ async def analyze_project(
             funding_usd=project.funding_usd,
             executive_summary=project.executive_summary,
             top_tasks=[t.title for t in project.tasks],
+            chains=project.chains,
+            links=project.ecosystem_links,
         )
 
     return ProjectDetailResponse.model_validate(project)

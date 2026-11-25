@@ -2,34 +2,35 @@
 
 import { useState } from "react";
 import {
-  AlertTriangle,
   Bell,
   BellOff,
   BookOpen,
+  Check,
   CheckCircle2,
   Circle,
+  Copy,
   ExternalLink,
   GitBranch,
   Globe,
+  Instagram,
+  Layers,
+  Link2,
   Loader2,
   MessageSquare,
-  Radar,
   RefreshCw,
   Send,
-  ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Trash2,
-  TrendingUp,
   X,
 } from "lucide-react";
-import type { MonitorCheckResult, ProjectDetail } from "@/types/airdrop";
+import type { EcosystemLink, MonitorCheckResult, ProjectDetail } from "@/types/airdrop";
 import { formatRelativeDate, formatUsd } from "@/lib/api";
 import { ScoreRing } from "./ScoreRing";
 
 interface ProjectDetailPanelProps {
   project: ProjectDetail;
   onClose: () => void;
+  onReanalyze: (url: string, docsUrl?: string | null) => Promise<void>;
   onToggleTask: (taskId: number, completed: boolean) => Promise<void>;
   onToggleMonitor: (enabled: boolean) => Promise<void>;
   onCheckUpdates: () => Promise<MonitorCheckResult | null>;
@@ -41,22 +42,125 @@ const BREAKDOWN_META = [
   { key: "backing_funding", label: "Backing & Funding (VCs)", max: 20 },
   { key: "tvl_traction", label: "TVL & Tração On-Chain", max: 20 },
   { key: "github_activity", label: "Atividade no GitHub", max: 15 },
-  { key: "airdrop_potential", label: "Potencial de Airdrop / Tokenless", max: 15 },
+  { key: "airdrop_potential", label: "Potencial de Airdrop", max: 15 },
   { key: "security_rug_resistance", label: "Segurança & Anti-Rug", max: 10 },
 ] as const;
+
+function buildDossierMarkdown(project: ProjectDetail, links: EcosystemLink[]): string {
+  const chainsStr = project.chains.length > 0 ? project.chains.join(", ") : "N/A";
+  const chainTvlLines = Object.entries(project.chain_tvls || {}).map(
+    ([c, v]) => `- ${c}: ${formatUsd(v)}`
+  );
+  const linkLines = links.map((l) => `- ${l.label}: ${l.url}`);
+  const taskLines = project.tasks.map(
+    (t) => `- [${t.completed ? "x" : " "}] **${t.title}** (${t.priority} | ${t.frequency}) — ${t.description}`
+  );
+
+  return [
+    `# ${project.name} — Due Diligence (${project.fundamental_score}/100 · ${project.verdict})`,
+    ``,
+    `**Setor:** ${project.category || "Web3"} | **Redes:** ${chainsStr}`,
+    `**TVL:** ${formatUsd(project.tvl_usd)} | **Funding:** ${formatUsd(project.funding_usd)} | **Backers:** ${project.investors.join(", ") || "N/A"}`,
+    ``,
+    `## Resumo Executivo`,
+    project.executive_summary,
+    ``,
+    `## Anexo — Canais & Links Vinculados`,
+    ...(linkLines.length > 0 ? linkLines : [`- Site: ${project.url}`]),
+    ...(chainTvlLines.length > 0 ? ["", "## TVL por Rede", ...chainTvlLines] : []),
+    ``,
+    `## Pontos Fortes (Bull Case)`,
+    ...project.bull_case.map((b) => `- ${b}`),
+    ``,
+    `## Riscos (Red Flags)`,
+    ...(project.red_flags.length > 0 ? project.red_flags.map((r) => `- ${r}`) : ["- Nenhum red flag crítico."]),
+    ...(taskLines.length > 0 ? ["", "## Plano Anti-Sybil", ...taskLines] : []),
+  ].join("\n");
+}
+
+function renderLinkIcon(type: string) {
+  switch (type) {
+    case "website":
+    case "app":
+      return <Globe className="h-3.5 w-3.5 text-zinc-400" />;
+    case "twitter":
+      return <span className="text-xs font-bold text-zinc-300 leading-none">𝕏</span>;
+    case "telegram":
+      return <Send className="h-3.5 w-3.5 text-zinc-400" />;
+    case "instagram":
+      return <Instagram className="h-3.5 w-3.5 text-zinc-400" />;
+    case "discord":
+      return <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />;
+    case "github":
+      return <GitBranch className="h-3.5 w-3.5 text-zinc-400" />;
+    case "docs":
+      return <BookOpen className="h-3.5 w-3.5 text-zinc-400" />;
+    case "audit":
+      return <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />;
+    default:
+      return <Link2 className="h-3.5 w-3.5 text-zinc-400" />;
+  }
+}
 
 export function ProjectDetailPanel({
   project,
   onClose,
+  onReanalyze,
   onToggleTask,
   onToggleMonitor,
   onCheckUpdates,
   onDelete,
 }: ProjectDetailPanelProps) {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [lastCheckMsg, setLastCheckMsg] = useState<string | null>(null);
   const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Build fallback ecosystem_links for older rows created before migration
+  const attachedLinks: EcosystemLink[] =
+    project.ecosystem_links && project.ecosystem_links.length > 0
+      ? project.ecosystem_links
+      : [
+          { label: "Site Oficial", type: "website", url: project.url },
+          ...(project.twitter_url
+            ? [{ label: "X (Twitter)", type: "twitter", url: project.twitter_url }]
+            : []),
+          ...(project.telegram_url
+            ? [{ label: "Telegram", type: "telegram", url: project.telegram_url }]
+            : []),
+          ...(project.instagram_url
+            ? [{ label: "Instagram", type: "instagram", url: project.instagram_url }]
+            : []),
+          ...(project.discord_url
+            ? [{ label: "Discord", type: "discord", url: project.discord_url }]
+            : []),
+          ...(project.github_url
+            ? [{ label: "GitHub", type: "github", url: project.github_url }]
+            : []),
+          ...(project.docs_url
+            ? [{ label: "Documentação", type: "docs", url: project.docs_url }]
+            : []),
+        ];
+
+  const chainTvlEntries = Object.entries(project.chain_tvls || {});
+  const totalChainTvl = chainTvlEntries.reduce((acc, [, v]) => acc + v, 0);
+
+  const handleCopyDossier = async () => {
+    await navigator.clipboard.writeText(buildDossierMarkdown(project, attachedLinks));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleReanalyze = async () => {
+    setReanalyzing(true);
+    try {
+      await onReanalyze(project.url, project.docs_url);
+    } finally {
+      setReanalyzing(false);
+    }
+  };
 
   const handleCheckNow = async () => {
     setCheckingUpdate(true);
@@ -66,7 +170,7 @@ export function ProjectDetailPanel({
       if (res) {
         setLastCheckMsg(
           res.changed
-            ? `Alteração detectada! ${res.alert_sent ? "(Alerta enviado no Telegram)" : "(Snapshot salvo no histórico)"}`
+            ? `Alteração detectada${res.alert_sent ? " · alerta enviado no Telegram" : ""}`
             : res.diff_summary || "Nenhuma alteração detectada."
         );
       }
@@ -96,109 +200,63 @@ export function ProjectDetailPanel({
   const completedCount = project.tasks.filter((t) => t.completed).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm">
-      <div className="relative h-full w-full max-w-4xl overflow-y-auto border-l border-border bg-canvas p-6 shadow-2xl md:p-8">
-        {/* Top bar */}
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-sm">
+      <div className="relative h-full w-full max-w-3xl overflow-y-auto border-l border-border bg-canvas px-6 py-6 md:px-8">
+        {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
           <div className="flex items-center gap-4">
-            <ScoreRing score={project.fundamental_score} size={76} strokeWidth={6} />
+            <ScoreRing score={project.fundamental_score} size={64} strokeWidth={5} />
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-2xl font-bold text-slate-100">{project.name}</h2>
+                <h2 className="text-xl font-semibold text-zinc-100">{project.name}</h2>
                 <span
-                  className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
                     project.verdict === "APPROVED"
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                      ? "bg-emerald-500/15 text-emerald-400"
                       : project.verdict === "WATCHLIST"
-                      ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
-                      : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                      ? "bg-amber-500/15 text-amber-400"
+                      : "bg-rose-500/15 text-rose-400"
                   }`}
                 >
                   {project.verdict}
                 </span>
-                <span className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs text-slate-400">
-                  {project.analysis_mode === "gemini" ? "Gemini AI" : "Modo Heurístico"}
-                </span>
               </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                <a
-                  href={project.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-emerald-300"
-                >
-                  <Globe className="h-3.5 w-3.5" />
-                  Site Oficial
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-                {project.docs_url && (
-                  <a
-                    href={project.docs_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 hover:text-cyan-300"
-                  >
-                    <BookOpen className="h-3.5 w-3.5" />
-                    Docs
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-                {project.github_url && (
-                  <a
-                    href={project.github_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 hover:text-slate-200"
-                  >
-                    <GitBranch className="h-3.5 w-3.5" />
-                    GitHub
-                    {project.github_stars !== null && ` (${project.github_stars}★)`}
-                  </a>
-                )}
-                {project.twitter_url && (
-                  <a
-                    href={project.twitter_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 hover:text-sky-300"
-                  >
-                    X / Twitter
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-                {project.discord_url && (
-                  <a
-                    href={project.discord_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 hover:text-indigo-300"
-                  >
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    Discord
-                  </a>
-                )}
-                {project.telegram_url && (
-                  <a
-                    href={project.telegram_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 hover:text-cyan-300"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    Telegram
-                  </a>
-                )}
-              </div>
+              <p className="mt-1 text-xs text-zinc-500">
+                {project.category || "Web3"} ·{" "}
+                {project.analysis_mode === "gemini" ? "Gemini AI" : "Heurístico"} ·
+                Atualizado em {formatRelativeDate(project.updated_at)}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleCopyDossier}
+              title="Copiar dossiê completo em Markdown"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-600 hover:text-white"
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+              {copied ? "Copiado" : "Copiar"}
+            </button>
+            <button
+              onClick={handleReanalyze}
+              disabled={reanalyzing}
+              title="Reanalisar projeto agora"
+              className="rounded-lg border border-border bg-surface p-1.5 text-zinc-400 transition hover:border-zinc-600 hover:text-white disabled:opacity-50"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${reanalyzing ? "animate-spin" : ""}`}
+              />
+            </button>
             <button
               onClick={handleDelete}
               disabled={deleting}
               title="Remover projeto"
-              className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2 text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-50"
+              className="rounded-lg border border-border bg-surface p-1.5 text-zinc-400 transition hover:border-rose-500/40 hover:text-rose-400 disabled:opacity-50"
             >
               {deleting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -208,26 +266,23 @@ export function ProjectDetailPanel({
             </button>
             <button
               onClick={onClose}
-              className="rounded-xl border border-border bg-surface p-2 text-slate-300 transition hover:bg-elevated hover:text-white"
+              className="rounded-lg border border-border bg-surface p-1.5 text-zinc-400 transition hover:border-zinc-600 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Executive summary */}
-        <section className="mt-6 rounded-2xl border border-border bg-surface/80 p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Resumo Executivo de Due Diligence
-          </h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-200">
+        {/* Summary & Key Telemetry */}
+        <section className="mt-6">
+          <p className="text-sm leading-relaxed text-zinc-300">
             {project.executive_summary}
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-border/70 bg-canvas/70 p-3">
-              <p className="text-[11px] text-slate-500">TVL On-Chain</p>
-              <p className="mt-1 font-mono-code text-base font-bold text-slate-100">
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <p className="text-[11px] text-zinc-500">TVL On-Chain</p>
+              <p className="mt-1 font-mono-code text-sm font-semibold text-zinc-100">
                 {formatUsd(project.tvl_usd)}
               </p>
               {project.tvl_change_7d !== null && (
@@ -242,50 +297,48 @@ export function ProjectDetailPanel({
               )}
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-canvas/70 p-3">
-              <p className="text-[11px] text-slate-500">VC Funding</p>
-              <p className="mt-1 font-mono-code text-base font-bold text-slate-100">
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <p className="text-[11px] text-zinc-500">Funding / Backers</p>
+              <p className="mt-1 font-mono-code text-sm font-semibold text-zinc-100">
                 {formatUsd(project.funding_usd)}
               </p>
-              <p className="text-[11px] text-slate-500">
-                {project.investors.length} investidor(es)
+              <p className="truncate text-[11px] text-zinc-500">
+                {project.investors.length > 0
+                  ? project.investors.slice(0, 2).join(", ")
+                  : "Não divulgado"}
               </p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-canvas/70 p-3">
-              <p className="text-[11px] text-slate-500">GitHub</p>
-              <p className="mt-1 font-mono-code text-base font-bold text-slate-100">
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <p className="text-[11px] text-zinc-500">GitHub</p>
+              <p className="mt-1 font-mono-code text-sm font-semibold text-zinc-100">
                 {project.github_stars !== null ? `${project.github_stars} ★` : "N/A"}
               </p>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-zinc-500">
                 {project.github_repos_count !== null
                   ? `${project.github_repos_count} repo(s)`
                   : "Não indexado"}
               </p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-canvas/70 p-3">
-              <p className="text-[11px] text-slate-500">Setor / Chains</p>
-              <p className="mt-1 truncate text-sm font-semibold text-slate-100">
-                {project.category || "Web3"}
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <p className="text-[11px] text-zinc-500">Redes Ativas</p>
+              <p className="mt-1 font-mono-code text-sm font-semibold text-zinc-100">
+                {project.chains.length || "—"}
               </p>
-              <p className="truncate text-[11px] text-slate-500">
-                {project.chains.length > 0
-                  ? project.chains.slice(0, 3).join(", ")
-                  : "Pre-Mainnet / Multi"}
+              <p className="truncate text-[11px] text-zinc-500">
+                {project.chains[0] || "Não detectada"}
               </p>
             </div>
           </div>
 
           {project.investors.length > 0 && (
-            <div className="mt-4 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-slate-500 mr-1">
-                Backers:
-              </span>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-zinc-500 mr-1">Investidores:</span>
               {project.investors.slice(0, 10).map((inv) => (
                 <span
                   key={inv}
-                  className="rounded-md border border-border bg-canvas px-2 py-0.5 text-xs text-slate-300"
+                  className="rounded bg-surface border border-border px-2 py-0.5 text-[11px] text-zinc-300"
                 >
                   {inv}
                 </span>
@@ -294,12 +347,114 @@ export function ProjectDetailPanel({
           )}
         </section>
 
-        {/* 6-pillar Score Breakdown */}
-        <section className="mt-6 rounded-2xl border border-border bg-surface/80 p-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Auditoria de Fundamentos (6 Pilares — 0 a 100)
+        {/* Anexo — Canais & Links Vinculados */}
+        <section className="mt-7 border-t border-border pt-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Anexo · Canais &amp; Links Vinculados ({attachedLinks.length})
+            </h3>
+            <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+              <span className={project.twitter_url ? "text-emerald-400" : ""}>
+                X {project.twitter_url ? "✓" : "—"}
+              </span>
+              <span className={project.telegram_url ? "text-emerald-400" : ""}>
+                Telegram {project.telegram_url ? "✓" : "—"}
+              </span>
+              <span className={project.instagram_url ? "text-emerald-400" : ""}>
+                Instagram {project.instagram_url ? "✓" : "—"}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {attachedLinks.map((item, idx) => (
+              <a
+                key={`${item.url}-${idx}`}
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs transition hover:border-zinc-600 hover:bg-elevated"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-canvas border border-border/80">
+                    {renderLinkIcon(item.type)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium text-zinc-200">{item.label}</p>
+                    <p className="truncate font-mono-code text-[11px] text-zinc-500">
+                      {item.url.replace(/^https?:\/\/(www\.)?/, "")}
+                    </p>
+                  </div>
+                </div>
+                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+              </a>
+            ))}
+          </div>
+        </section>
+
+        {/* Redes & Distribuição de TVL */}
+        <section className="mt-7 border-t border-border pt-6">
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <Layers className="h-3.5 w-3.5" />
+            Redes em Operação
           </h3>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+
+          {project.chains.length === 0 ? (
+            <p className="mt-2 text-xs text-zinc-500">
+              Nenhuma rede blockchain específica detectada automaticamente até o momento.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2.5">
+              <div className="flex flex-wrap gap-1.5">
+                {project.chains.map((chain) => (
+                  <span
+                    key={chain}
+                    className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-zinc-200"
+                  >
+                    {chain}
+                  </span>
+                ))}
+              </div>
+
+              {chainTvlEntries.length > 0 && (
+                <div className="mt-3 space-y-2 rounded-lg border border-border bg-surface p-3.5">
+                  <p className="text-[11px] text-zinc-500">
+                    Distribuição de TVL por rede (DefiLlama)
+                  </p>
+                  {chainTvlEntries.slice(0, 6).map(([chainName, tvlVal]) => {
+                    const share =
+                      totalChainTvl > 0
+                        ? Math.max(1, Math.round((tvlVal / totalChainTvl) * 100))
+                        : 100;
+                    return (
+                      <div key={chainName}>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-zinc-200">{chainName}</span>
+                          <span className="font-mono-code text-zinc-400">
+                            {formatUsd(tvlVal)} ({share}%)
+                          </span>
+                        </div>
+                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-800">
+                          <div
+                            className="h-full rounded-full bg-emerald-500/80"
+                            style={{ width: `${share}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Score Breakdown */}
+        <section className="mt-7 border-t border-border pt-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            Auditoria Fundamentalista (6 Pilares)
+          </h3>
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
             {BREAKDOWN_META.map(({ key, label, max }) => {
               const val = project.score_breakdown?.[key] ?? 0;
               const pct = Math.min(100, Math.round((val / max) * 100));
@@ -312,17 +467,17 @@ export function ProjectDetailPanel({
               return (
                 <div
                   key={key}
-                  className="rounded-xl border border-border/60 bg-canvas/60 p-3"
+                  className="rounded-lg border border-border bg-surface p-3"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-300">{label}</span>
-                    <span className="font-mono-code font-semibold text-slate-100">
+                    <span className="text-zinc-300">{label}</span>
+                    <span className="font-mono-code text-zinc-100">
                       {val}/{max}
                     </span>
                   </div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                  <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-zinc-800">
                     <div
-                      className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                      className={`h-full rounded-full ${barColor}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -330,155 +485,102 @@ export function ProjectDetailPanel({
               );
             })}
           </div>
-        </section>
 
-        {/* Bull Case vs Red Flags */}
-        <section className="mt-6 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-300">
-              <TrendingUp className="h-4 w-4" />
-              Bull Case &amp; Catalisadores
-            </h3>
-            <ul className="mt-3 space-y-2 text-sm text-slate-200">
-              {project.bull_case.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Bull case & Red flags */}
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <h4 className="text-xs font-semibold text-emerald-400">
+                Pontos Fortes
+              </h4>
+              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-zinc-300">
+                {project.bull_case.map((item, idx) => (
+                  <li key={idx}>• {item}</li>
+                ))}
+              </ul>
+            </div>
 
-          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5">
-            <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-rose-300">
-              <AlertTriangle className="h-4 w-4" />
-              Red Flags &amp; Riscos
-            </h3>
-            <ul className="mt-3 space-y-2 text-sm text-slate-200">
-              {project.red_flags.length > 0 ? (
-                project.red_flags.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-rose-400 shrink-0" />
-                    <span>{item}</span>
-                  </li>
-                ))
-              ) : (
-                <li className="text-slate-400">Nenhum red flag crítico identificado.</li>
-              )}
-            </ul>
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <h4 className="text-xs font-semibold text-rose-400">
+                Riscos &amp; Red Flags
+              </h4>
+              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-zinc-300">
+                {project.red_flags.length > 0 ? (
+                  project.red_flags.map((item, idx) => <li key={idx}>• {item}</li>)
+                ) : (
+                  <li className="text-zinc-500">Nenhum red flag crítico.</li>
+                )}
+              </ul>
+            </div>
           </div>
         </section>
 
         {/* Anti-Sybil Strategic Plan */}
-        <section className="mt-6 rounded-2xl border border-border bg-surface/80 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-              {project.fundamental_score >= 70 ? (
-                <ShieldCheck className="h-4 w-4 text-emerald-400" />
-              ) : (
-                <ShieldAlert className="h-4 w-4 text-amber-400" />
-              )}
-              Plano de Interação Estratégica (Anti-Sybil)
+        <section className="mt-7 border-t border-border pt-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Plano Estratégico Anti-Sybil
             </h3>
             {project.tasks.length > 0 && (
-              <span className="font-mono-code text-xs text-emerald-300">
+              <span className="font-mono-code text-xs text-zinc-400">
                 {completedCount}/{project.tasks.length} concluídas
               </span>
             )}
           </div>
-
-          <p className="mt-2 text-xs leading-relaxed text-slate-400">
-            {project.anti_sybil_strategy}
-          </p>
+          <p className="mt-2 text-xs text-zinc-400">{project.anti_sybil_strategy}</p>
 
           {project.tasks.length === 0 ? (
-            <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs text-amber-200">
-              Este projeto ficou abaixo do corte mínimo de <strong>70 pontos</strong>.
-              Por segurança de capital e foco em Alpha real, o plano de farming
-              Anti-Sybil só é gerado para projetos aprovados (Score ≥ 70).
-            </div>
+            <p className="mt-3 rounded-lg border border-border bg-surface p-3.5 text-xs text-zinc-400">
+              Score abaixo de 70 pontos — plano de farming não recomendado.
+            </p>
           ) : (
-            <div className="mt-4 space-y-3">
+            <div className="mt-3 space-y-2">
               {project.tasks.map((task) => (
                 <div
                   key={task.id}
-                  className={`rounded-xl border p-4 transition ${
+                  className={`rounded-lg border p-3.5 transition ${
                     task.completed
-                      ? "border-emerald-500/25 bg-emerald-500/5 opacity-75"
-                      : "border-border bg-canvas/70 hover:border-slate-600"
+                      ? "border-border/60 bg-surface/50 opacity-60"
+                      : "border-border bg-surface"
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <button
                       onClick={() => handleTaskClick(task.id, task.completed)}
                       disabled={togglingTaskId === task.id}
-                      className="mt-0.5 text-emerald-400 hover:text-emerald-300 shrink-0"
+                      className="mt-0.5 text-emerald-400 shrink-0"
                     >
                       {togglingTaskId === task.id ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                       ) : task.completed ? (
-                        <CheckCircle2 className="h-5 w-5" />
+                        <CheckCircle2 className="h-4 w-4" />
                       ) : (
-                        <Circle className="h-5 w-5 text-slate-500" />
+                        <Circle className="h-4 w-4 text-zinc-600 hover:text-zinc-400" />
                       )}
                     </button>
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h4
-                          className={`text-sm font-semibold ${
+                          className={`text-xs font-semibold ${
                             task.completed
-                              ? "line-through text-slate-400"
-                              : "text-slate-100"
+                              ? "line-through text-zinc-500"
+                              : "text-zinc-100"
                           }`}
                         >
                           {task.title}
                         </h4>
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                            task.priority === "HIGH"
-                              ? "bg-rose-500/15 text-rose-300"
-                              : task.priority === "MEDIUM"
-                              ? "bg-amber-500/15 text-amber-300"
-                              : "bg-slate-700 text-slate-300"
-                          }`}
-                        >
-                          {task.priority}
-                        </span>
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">
-                          {task.category}
-                        </span>
-                        <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-cyan-300">
-                          {task.frequency}
-                        </span>
-                        <span className="font-mono-code text-[10px] text-slate-400">
-                          Custo est.: {task.estimated_cost_usd}
+                        <span className="font-mono-code text-[10px] text-zinc-500">
+                          {task.priority} · {task.frequency} · {task.estimated_cost_usd}
                         </span>
                       </div>
-
-                      <p className="mt-1.5 text-xs leading-relaxed text-slate-300">
+                      <p className="mt-1 text-xs leading-relaxed text-zinc-400">
                         {task.description}
                       </p>
-
                       {task.anti_sybil_tip && (
-                        <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-3 py-2 text-[11px] text-cyan-200">
-                          <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-400" />
-                          <span>
-                            <strong>Anti-Sybil:</strong> {task.anti_sybil_tip}
-                          </span>
-                        </div>
-                      )}
-
-                      {task.action_url && (
-                        <a
-                          href={task.action_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline"
-                        >
-                          Abrir dApp / Docs
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
+                        <p className="mt-1.5 text-[11px] text-zinc-500">
+                          <span className="text-zinc-300 font-medium">Dica Anti-Sybil:</span>{" "}
+                          {task.anti_sybil_tip}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -488,40 +590,32 @@ export function ProjectDetailPanel({
           )}
         </section>
 
-        {/* Roadmap & Docs Monitor */}
-        <section className="mt-6 rounded-2xl border border-border bg-surface/80 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Roadmap Monitor */}
+        <section className="mt-7 border-t border-border pt-6 pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-100">
-                <Radar className="h-4 w-4 text-cyan-400" />
-                Monitoramento de Roadmap &amp; Docs
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                Monitor de Roadmap &amp; Docs
               </h3>
-              <p className="mt-1 text-xs text-slate-400">
-                URL monitorada:{" "}
-                <span className="font-mono-code text-slate-300">
-                  {project.monitored_url || project.url}
-                </span>
+              <p className="mt-1 font-mono-code text-[11px] text-zinc-500">
+                {project.monitored_url || project.url}
               </p>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onToggleMonitor(!project.monitoring_enabled)}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition ${
-                  project.monitoring_enabled
-                    ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20"
-                    : "border-border bg-canvas text-slate-400 hover:text-slate-200"
-                }`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-600"
               >
                 {project.monitoring_enabled ? (
                   <>
-                    <Bell className="h-3.5 w-3.5" />
-                    Monitor Ativo
+                    <Bell className="h-3.5 w-3.5 text-emerald-400" />
+                    Ativo
                   </>
                 ) : (
                   <>
-                    <BellOff className="h-3.5 w-3.5" />
-                    Monitor Pausado
+                    <BellOff className="h-3.5 w-3.5 text-zinc-500" />
+                    Pausado
                   </>
                 )}
               </button>
@@ -529,53 +623,34 @@ export function ProjectDetailPanel({
               <button
                 onClick={handleCheckNow}
                 disabled={checkingUpdate}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-elevated px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-cyan-500/40 hover:text-white disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-600 disabled:opacity-50"
               >
                 {checkingUpdate ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
-                Verificar Agora
+                Checar
               </button>
             </div>
           </div>
 
-          <p className="mt-3 text-xs text-slate-300">{project.roadmap_summary}</p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            Última verificação: {formatRelativeDate(project.last_checked_at)} • Hash:{" "}
-            <span className="font-mono-code">
-              {project.last_content_hash?.slice(0, 12) || "N/A"}
-            </span>
-          </p>
-
           {lastCheckMsg && (
-            <div className="mt-3 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3.5 py-2 text-xs text-cyan-200">
-              {lastCheckMsg}
-            </div>
+            <p className="mt-2.5 text-xs text-emerald-400">{lastCheckMsg}</p>
           )}
 
           {project.roadmap_snapshots.length > 0 && (
-            <div className="mt-4 space-y-2.5">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Histórico de Alterações Detectadas
-              </h4>
+            <div className="mt-3 space-y-2">
               {project.roadmap_snapshots.map((snap) => (
                 <div
                   key={snap.id}
-                  className="rounded-xl border border-border bg-canvas/80 p-3.5 text-xs"
+                  className="rounded-lg border border-border bg-surface p-3 text-xs"
                 >
-                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-500">
                     <span>{formatRelativeDate(snap.detected_at)}</span>
-                    <span
-                      className={
-                        snap.alert_sent ? "text-emerald-400" : "text-slate-500"
-                      }
-                    >
-                      {snap.alert_sent ? "Alerta Telegram enviado" : "Registrado localmente"}
-                    </span>
+                    <span>{snap.alert_sent ? "Telegram ✓" : "Local"}</span>
                   </div>
-                  <p className="mt-2 whitespace-pre-line text-slate-200">
+                  <p className="mt-1.5 whitespace-pre-line text-zinc-300">
                     {snap.diff_summary}
                   </p>
                 </div>

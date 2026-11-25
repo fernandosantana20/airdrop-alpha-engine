@@ -70,11 +70,22 @@ class TelegramNotifier:
         funding_usd: Optional[float],
         executive_summary: str,
         top_tasks: List[str],
+        chains: Optional[List[str]] = None,
+        links: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, object]:
         safe_name = html.escape(project_name)
         safe_url = html.escape(url)
         safe_cat = html.escape(category or "Web3")
         safe_summary = html.escape(executive_summary[:500])
+        chains_text = html.escape(", ".join(chains[:6])) if chains else "N/A"
+
+        links_block = ""
+        if links:
+            link_lines = [
+                f"• <a href=\"{html.escape(l['url'])}\">{html.escape(l['label'])}</a>"
+                for l in links[:8]
+            ]
+            links_block = "\n\n<b>📎 Anexo — Canais Oficiais:</b>\n" + "\n".join(link_lines)
 
         tasks_block = ""
         if top_tasks:
@@ -86,9 +97,11 @@ class TelegramNotifier:
             f"━━━━━━━━━━━━━━━━━━\n"
             f"📊 <b>Fundamental Score:</b> <code>{score}/100</code>\n"
             f"🏷 <b>Setor:</b> {safe_cat}\n"
+            f"🌐 <b>Redes:</b> {chains_text}\n"
             f"💰 <b>TVL:</b> {_fmt_usd(tvl_usd)} | <b>Funding:</b> {_fmt_usd(funding_usd)}\n"
             f"🔗 <a href=\"{safe_url}\">{safe_url}</a>\n\n"
             f"<b>📝 Resumo Due Diligence:</b>\n{safe_summary}"
+            f"{links_block}"
             f"{tasks_block}"
         )
         return await self.send_message(msg)

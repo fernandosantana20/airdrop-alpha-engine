@@ -1,5 +1,11 @@
 export type Verdict = "APPROVED" | "WATCHLIST" | "REJECTED";
 
+export interface EcosystemLink {
+  label: string;
+  type: string;
+  url: string;
+}
+
 export interface ScoreBreakdown {
   product_utility: number;
   backing_funding: number;
@@ -41,6 +47,10 @@ export interface ProjectListItem {
   name: string;
   slug: string;
   url: string;
+  docs_url: string | null;
+  twitter_url: string | null;
+  telegram_url: string | null;
+  instagram_url: string | null;
   category: string | null;
   chains: string[];
   tvl_usd: number | null;
@@ -66,8 +76,11 @@ export interface ProjectDetail {
   twitter_url: string | null;
   discord_url: string | null;
   telegram_url: string | null;
+  instagram_url: string | null;
+  ecosystem_links: EcosystemLink[];
   category: string | null;
   chains: string[];
+  chain_tvls: Record<string, number>;
   tvl_usd: number | null;
   tvl_change_7d: number | null;
   funding_usd: number | null;

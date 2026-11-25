@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +177,12 @@ class RoadmapSnapshotResponse(BaseModel):
     detected_at: datetime
 
 
+class EcosystemLink(BaseModel):
+    label: str
+    type: str
+    url: str
+
+
 class ProjectListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -184,6 +190,10 @@ class ProjectListItem(BaseModel):
     name: str
     slug: str
     url: str
+    docs_url: Optional[str] = None
+    twitter_url: Optional[str] = None
+    telegram_url: Optional[str] = None
+    instagram_url: Optional[str] = None
     category: Optional[str] = None
     chains: List[str] = Field(default_factory=list)
     tvl_usd: Optional[float] = None
@@ -211,8 +221,21 @@ class ProjectDetailResponse(BaseModel):
     twitter_url: Optional[str] = None
     discord_url: Optional[str] = None
     telegram_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    ecosystem_links: List[EcosystemLink] = Field(default_factory=list)
     category: Optional[str] = None
     chains: List[str] = Field(default_factory=list)
+    chain_tvls: Dict[str, float] = Field(default_factory=dict)
+
+    @field_validator("ecosystem_links", "chains", "investors", "bull_case", "red_flags", mode="before")
+    @classmethod
+    def _coerce_none_list(cls, v):
+        return [] if v is None else v
+
+    @field_validator("chain_tvls", "score_breakdown", mode="before")
+    @classmethod
+    def _coerce_none_dict(cls, v):
+        return {} if v is None else v
     tvl_usd: Optional[float] = None
     tvl_change_7d: Optional[float] = None
     funding_usd: Optional[float] = None

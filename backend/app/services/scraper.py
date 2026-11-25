@@ -47,6 +47,9 @@ class ScrapedProjectData:
     twitter_url: Optional[str] = None
     discord_url: Optional[str] = None
     telegram_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    extra_links: List[Dict[str, str]] = field(default_factory=list)
+    detected_chains: List[str] = field(default_factory=list)
     github_metrics: Optional[GitHubMetrics] = None
     monitored_url: str = ""
     content_hash: str = ""
@@ -94,6 +97,42 @@ def clean_text_for_hash(text: str) -> str:
 def compute_content_hash(text: str) -> str:
     normalized = clean_text_for_hash(text)
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+KNOWN_CHAINS = [
+    ("Ethereum", r"\bethereum\b|\bmainnet\b"),
+    ("Arbitrum", r"\barbitrum\b"),
+    ("Base", r"\bbase chain\b|\bon base\b|\bbase network\b|\bbase l2\b"),
+    ("Optimism", r"\boptimism\b|\bop mainnet\b"),
+    ("Solana", r"\bsolana\b"),
+    ("Berachain", r"\bberachain\b"),
+    ("Hyperliquid", r"\bhyperliquid\b|\bhyperevm\b"),
+    ("Monad", r"\bmonad\b"),
+    ("MegaETH", r"\bmegaeth\b"),
+    ("Polygon", r"\bpolygon\b"),
+    ("Avalanche", r"\bavalanche\b|\bavax\b"),
+    ("BNB Chain", r"\bbnb chain\b|\bbnb smart chain\b|\bbsc\b"),
+    ("Sui", r"\bsui network\b|\bon sui\b"),
+    ("Aptos", r"\baptos\b"),
+    ("Starknet", r"\bstarknet\b"),
+    ("zkSync", r"\bzksync\b"),
+    ("Linea", r"\blinea\b"),
+    ("Scroll", r"\bscroll\b"),
+    ("Mantle", r"\bmantle\b"),
+    ("Blast", r"\bblast\b"),
+    ("TON", r"\bton blockchain\b|\bthe open network\b"),
+    ("Sei", r"\bsei network\b|\bsei v2\b"),
+    ("Sonic", r"\bsonic\b"),
+]
+
+
+def detect_chains_in_text(text: str) -> List[str]:
+    low = text.lower()
+    found: List[str] = []
+    for chain_name, pattern in KNOWN_CHAINS:
+        if re.search(pattern, low):
+            found.append(chain_name)
+    return found
 
 
 def extract_clean_text_from_html(html: str, max_chars: int = 14000) -> Tuple[str, str, str]:
@@ -147,7 +186,7 @@ class Web3Scraper:
             logger.warning("Failed to fetch %s: %s", url, exc)
             return None, f"Could not fetch {url}: {exc}"
 
-    def _discover_links(self, html: str, base_url: str) -> Dict[str, Optional[str]]:
+    def _discover_links(self, html: str, base_url: str) -> Tuple[Dict[str, Optional[str]], List[Dict[str, str]]]:
         soup = BeautifulSoup(html, "html.parser")
         links: Dict[str, Optional[str]] = {
             "docs": None,
@@ -156,7 +195,18 @@ class Web3Scraper:
             "twitter": None,
             "discord": None,
             "telegram": None,
+            "instagram": None,
         }
+        extras: List[Dict[str, str]] = []
+        seen_extra: set[str] = set()
+
+        # Check meta twitter:site / twitter:creator
+        for meta_name in ("twitter:site", "twitter:creator"):
+            tag = soup.find("meta", attrs={"name": meta_name})
+            if tag and tag.get("content") and not links["twitter"]:
+                handle = str(tag["content"]).strip().lstrip("@")
+                if handle and " " not in handle and "/" not in handle:
+                    links["twitter"] = f"https://x.com/{handle}"
 
         for a in soup.find_all("a", href=True):
             raw_href = str(a["href"]).strip()
@@ -168,7 +218,6 @@ class Web3Scraper:
             anchor_text = a.get_text(" ", strip=True).lower()
 
             if not links["github"] and "github.com/" in lower_url:
-                # Ignore generic github links or issue links if possible
                 parsed = urlparse(full_url)
                 parts = [p for p in parsed.path.split("/") if p]
                 if parts:
@@ -190,6 +239,9 @@ class Web3Scraper:
             ):
                 links["telegram"] = full_url
 
+            if not links["instagram"] and "instagram.com/" in lower_url:
+                links["instagram"] = full_url
+
             if not links["docs"] and (
                 "docs." in lower_url
                 or "gitbook.io" in lower_url
@@ -208,7 +260,21 @@ class Web3Scraper:
             ):
                 links["roadmap"] = full_url
 
-        return links
+            # Capture additional ecosystem channels
+            for label, kind, match_fn in (
+                ("YouTube", "youtube", lambda u: "youtube.com/" in u or "youtu.be/" in u),
+                ("LinkedIn", "linkedin", lambda u: "linkedin.com/" in u),
+                ("Medium", "blog", lambda u: "medium.com/" in u),
+                ("Mirror", "blog", lambda u: "mirror.xyz" in u),
+                ("Blog", "blog", lambda u: "/blog" in u or "blog." in u),
+                ("Governance / Snapshot", "governance", lambda u: "snapshot.org" in u or "tally.xyz" in u),
+                ("Galxe / Guild", "community", lambda u: "galxe.com" in u or "guild.xyz" in u or "zealy.io" in u),
+            ):
+                if match_fn(lower_url) and full_url not in seen_extra:
+                    seen_extra.add(full_url)
+                    extras.append({"label": label, "type": kind, "url": full_url})
+
+        return links, extras
 
     async def fetch_github_metrics(
         self, client: httpx.AsyncClient, github_url: str
@@ -299,8 +365,8 @@ class Web3Scraper:
             logger.debug("Jina Reader fallback failed for %s: %s", url, exc)
         return None
 
-    def _discover_links_from_text(self, text: str) -> Dict[str, Optional[str]]:
-        """Extract docs, github, twitter, discord, telegram URLs from Markdown/plain text."""
+    def _discover_links_from_text(self, text: str) -> Tuple[Dict[str, Optional[str]], List[Dict[str, str]]]:
+        """Extract docs, github, twitter, discord, telegram, instagram & extra URLs from text."""
         found: Dict[str, Optional[str]] = {
             "docs": None,
             "roadmap": None,
@@ -308,7 +374,10 @@ class Web3Scraper:
             "twitter": None,
             "discord": None,
             "telegram": None,
+            "instagram": None,
         }
+        extras: List[Dict[str, str]] = []
+        seen_extra: set[str] = set()
         urls = re.findall(r"https?://[^\s\)\]\>\"']+", text)
         for u in urls:
             u = u.rstrip(".,;:")
@@ -324,6 +393,8 @@ class Web3Scraper:
                 found["discord"] = u
             if not found["telegram"] and ("t.me/" in low or "telegram.me/" in low):
                 found["telegram"] = u
+            if not found["instagram"] and "instagram.com/" in low:
+                found["instagram"] = u
             if not found["docs"] and (
                 "docs." in low or "gitbook.io" in low or "/docs" in low
             ):
@@ -331,7 +402,17 @@ class Web3Scraper:
                     found["docs"] = u
             if not found["roadmap"] and ("roadmap" in low or "tokenomics" in low):
                 found["roadmap"] = u
-        return found
+            for label, kind, match_fn in (
+                ("YouTube", "youtube", lambda s: "youtube.com/" in s or "youtu.be/" in s),
+                ("LinkedIn", "linkedin", lambda s: "linkedin.com/" in s),
+                ("Medium", "blog", lambda s: "medium.com/" in s),
+                ("Mirror", "blog", lambda s: "mirror.xyz" in s),
+                ("Governance", "governance", lambda s: "snapshot.org" in s or "tally.xyz" in s),
+            ):
+                if match_fn(low) and u not in seen_extra:
+                    seen_extra.add(u)
+                    extras.append({"label": label, "type": kind, "url": u})
+        return found, extras
 
     async def scrape_project(
         self, url: str, explicit_docs_url: Optional[str] = None
@@ -347,6 +428,24 @@ class Web3Scraper:
             docs_url=normalize_url(explicit_docs_url) if explicit_docs_url else None,
         )
 
+        def _merge_links(discovered_map: Dict[str, Optional[str]], extra_list: List[Dict[str, str]]) -> None:
+            for key, attr in (
+                ("docs", "docs_url"),
+                ("roadmap", "roadmap_url"),
+                ("github", "github_url"),
+                ("twitter", "twitter_url"),
+                ("discord", "discord_url"),
+                ("telegram", "telegram_url"),
+                ("instagram", "instagram_url"),
+            ):
+                if not getattr(result, attr) and discovered_map.get(key):
+                    setattr(result, attr, discovered_map[key])
+            existing_extra_urls = {item["url"] for item in result.extra_links}
+            for item in extra_list:
+                if item["url"] not in existing_extra_urls:
+                    existing_extra_urls.add(item["url"])
+                    result.extra_links.append(item)
+
         async with httpx.AsyncClient() as client:
             main_html, err = await self.fetch_html(client, normalized)
             if err:
@@ -358,18 +457,12 @@ class Web3Scraper:
                 result.meta_description = meta_desc
                 result.main_text = text
 
-                discovered = self._discover_links(main_html, normalized)
-                if not result.docs_url:
-                    result.docs_url = discovered["docs"]
-                result.roadmap_url = discovered["roadmap"]
-                result.github_url = discovered["github"]
-                result.twitter_url = discovered["twitter"]
-                result.discord_url = discovered["discord"]
-                result.telegram_url = discovered["telegram"]
+                discovered, extras = self._discover_links(main_html, normalized)
+                _merge_links(discovered, extras)
 
             # If user pasted an app.* / trade.* subdomain, also probe the root landing domain
             root_url = f"https://{domain}"
-            if root_url != normalized and len(result.main_text) < 500:
+            if root_url != normalized:
                 root_html, _ = await self.fetch_html(client, root_url)
                 if root_html:
                     r_title, r_meta, r_text = extract_clean_text_from_html(root_html)
@@ -377,17 +470,8 @@ class Web3Scraper:
                         result.main_text = r_text
                         result.title = result.title or r_title
                         result.meta_description = result.meta_description or r_meta
-                    r_links = self._discover_links(root_html, root_url)
-                    for key, attr in (
-                        ("docs", "docs_url"),
-                        ("roadmap", "roadmap_url"),
-                        ("github", "github_url"),
-                        ("twitter", "twitter_url"),
-                        ("discord", "discord_url"),
-                        ("telegram", "telegram_url"),
-                    ):
-                        if not getattr(result, attr) and r_links[key]:
-                            setattr(result, attr, r_links[key])
+                    r_links, r_extras = self._discover_links(root_html, root_url)
+                    _merge_links(r_links, r_extras)
 
             # SPA fallback: if raw HTML had almost no readable text, render via Jina Reader
             if len(result.main_text) < 300:
@@ -395,17 +479,8 @@ class Web3Scraper:
                 md_text = await self.fetch_jina_markdown(client, jina_target)
                 if md_text:
                     result.main_text = clean_text_for_hash(md_text)[:12000]
-                    md_links = self._discover_links_from_text(md_text)
-                    for key, attr in (
-                        ("docs", "docs_url"),
-                        ("roadmap", "roadmap_url"),
-                        ("github", "github_url"),
-                        ("twitter", "twitter_url"),
-                        ("discord", "discord_url"),
-                        ("telegram", "telegram_url"),
-                    ):
-                        if not getattr(result, attr) and md_links[key]:
-                            setattr(result, attr, md_links[key])
+                    md_links, md_extras = self._discover_links_from_text(md_text)
+                    _merge_links(md_links, md_extras)
 
             # Probe docs.<domain> automatically if docs_url is still unknown
             if not result.docs_url and domain:
@@ -416,15 +491,8 @@ class Web3Scraper:
                     if len(docs_text) > 150:
                         result.docs_url = candidate_docs
                         result.docs_text = docs_text
-                        docs_links = self._discover_links(docs_html, candidate_docs)
-                        if not result.github_url and docs_links["github"]:
-                            result.github_url = docs_links["github"]
-                        if not result.roadmap_url and docs_links["roadmap"]:
-                            result.roadmap_url = docs_links["roadmap"]
-                        if not result.twitter_url and docs_links["twitter"]:
-                            result.twitter_url = docs_links["twitter"]
-                        if not result.discord_url and docs_links["discord"]:
-                            result.discord_url = docs_links["discord"]
+                        d_links, d_extras = self._discover_links(docs_html, candidate_docs)
+                        _merge_links(d_links, d_extras)
 
             # Scrape Docs / GitBook if discovered or provided
             if result.docs_url and not result.docs_text and result.docs_url != normalized:
@@ -434,15 +502,8 @@ class Web3Scraper:
                 elif docs_html:
                     _, _, docs_text = extract_clean_text_from_html(docs_html, max_chars=12000)
                     result.docs_text = docs_text
-                    docs_links = self._discover_links(docs_html, result.docs_url)
-                    if not result.github_url and docs_links["github"]:
-                        result.github_url = docs_links["github"]
-                    if not result.roadmap_url and docs_links["roadmap"]:
-                        result.roadmap_url = docs_links["roadmap"]
-                    if not result.twitter_url and docs_links["twitter"]:
-                        result.twitter_url = docs_links["twitter"]
-                    if not result.discord_url and docs_links["discord"]:
-                        result.discord_url = docs_links["discord"]
+                    d_links, d_extras = self._discover_links(docs_html, result.docs_url)
+                    _merge_links(d_links, d_extras)
 
             # Scrape Roadmap page if discovered
             if result.roadmap_url and result.roadmap_url not in {normalized, result.docs_url}:
@@ -456,6 +517,10 @@ class Web3Scraper:
                 result.github_metrics = await self.fetch_github_metrics(
                     client, result.github_url
                 )
+
+        result.detected_chains = detect_chains_in_text(
+            f"{result.title} {result.meta_description} {result.main_text[:5000]} {result.docs_text[:4000]}"
+        )
 
         # Decide best URL to monitor for future roadmap/docs updates
         if result.roadmap_url and result.roadmap_text:

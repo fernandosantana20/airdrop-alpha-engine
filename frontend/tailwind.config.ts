@@ -9,10 +9,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        canvas: "#080b12",
-        surface: "#101624",
-        elevated: "#161f33",
-        border: "#222d44",
+        canvas: "#09090b",
+        surface: "#111114",
+        elevated: "#18181b",
+        border: "#27272a",
       },
     },
   },

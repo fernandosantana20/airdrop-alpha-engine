@@ -14,6 +14,8 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    inspect,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Session, relationship, sessionmaker
 
@@ -65,10 +67,13 @@ class Project(Base):
     twitter_url = Column(String(500), nullable=True)
     discord_url = Column(String(500), nullable=True)
     telegram_url = Column(String(500), nullable=True)
+    instagram_url = Column(String(500), nullable=True)
+    ecosystem_links = Column(JSON, default=list, nullable=False)
 
     # On-chain & GitHub metrics
     category = Column(String(120), nullable=True)
     chains = Column(JSON, default=list, nullable=False)
+    chain_tvls = Column(JSON, default=dict, nullable=False)
     tvl_usd = Column(Float, nullable=True)
     tvl_change_7d = Column(Float, nullable=True)
     funding_usd = Column(Float, nullable=True)
@@ -155,6 +160,21 @@ class RoadmapSnapshot(Base):
 
 def init_db() -> None:
     Base.metadata.create_all(bind=engine)
+    # Safe idempotent column migrations for existing SQLite / Postgres tables
+    inspector = inspect(engine)
+    if "projects" in inspector.get_table_names():
+        existing_cols = {c["name"] for c in inspector.get_columns("projects")}
+        migrations = [
+            ("instagram_url", "VARCHAR(500)"),
+            ("ecosystem_links", "JSON" if not db_url.startswith("sqlite") else "TEXT"),
+            ("chain_tvls", "JSON" if not db_url.startswith("sqlite") else "TEXT"),
+        ]
+        with engine.begin() as conn:
+            for col_name, col_type in migrations:
+                if col_name not in existing_cols:
+                    conn.execute(
+                        text(f"ALTER TABLE projects ADD COLUMN {col_name} {col_type}")
+                    )
 
 
 def get_db() -> Generator[Session, None, None]:

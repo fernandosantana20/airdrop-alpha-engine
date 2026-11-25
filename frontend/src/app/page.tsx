@@ -1,18 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Activity,
-  AlertCircle,
-  BellRing,
-  CheckCircle2,
-  Cpu,
-  Radar,
-  Search,
-  Send,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
+import { Radar, Search, Send, X } from "lucide-react";
 import type {
   DashboardStats,
   HealthStatus,
@@ -26,9 +15,9 @@ import { ProjectDetailPanel } from "@/components/ProjectDetailPanel";
 
 const VERDICT_TABS = [
   { id: "ALL", label: "Todos" },
-  { id: "APPROVED", label: "Aprovados (≥70)" },
-  { id: "WATCHLIST", label: "Watchlist (50-69)" },
-  { id: "REJECTED", label: "Reprovados (<50)" },
+  { id: "APPROVED", label: "Aprovados" },
+  { id: "WATCHLIST", label: "Watchlist" },
+  { id: "REJECTED", label: "Reprovados" },
 ] as const;
 
 export default function DashboardPage() {
@@ -60,9 +49,9 @@ export default function DashboardPage() {
     } catch (err) {
       setBanner({
         type: "error",
-        text: `Não foi possível conectar ao backend FastAPI (${
-          err instanceof Error ? err.message : "erro desconhecido"
-        }). Verifique se o servidor está rodando na porta 8000.`,
+        text: `Erro de conexão com a API (${
+          err instanceof Error ? err.message : "desconhecido"
+        }).`,
       });
     }
   }, [verdictFilter, searchQuery]);
@@ -83,7 +72,7 @@ export default function DashboardPage() {
       setSelectedProject(detail);
       setBanner({
         type: detail.fundamental_score >= 70 ? "success" : "info",
-        text: `${detail.name} auditado com score ${detail.fundamental_score}/100 (${detail.verdict}).`,
+        text: `${detail.name}: ${detail.fundamental_score}/100 (${detail.verdict})`,
       });
       await loadData();
     } catch (err) {
@@ -98,6 +87,16 @@ export default function DashboardPage() {
     }
   };
 
+  const handleReanalyzeSelected = async (url: string, docsUrl?: string | null) => {
+    const detail = await api.analyzeProject({
+      url,
+      docs_url: docsUrl || undefined,
+      force_refresh: true,
+    });
+    setSelectedProject(detail);
+    await loadData();
+  };
+
   const handleSelectProject = async (id: number) => {
     try {
       const detail = await api.getProject(id);
@@ -105,7 +104,7 @@ export default function DashboardPage() {
     } catch (err) {
       setBanner({
         type: "error",
-        text: `Falha ao carregar detalhes: ${
+        text: `Falha ao abrir projeto: ${
           err instanceof Error ? err.message : "erro"
         }`,
       });
@@ -140,7 +139,6 @@ export default function DashboardPage() {
   const handleDeleteProject = async (id: number) => {
     await api.deleteProject(id);
     setSelectedProject(null);
-    setBanner({ type: "info", text: "Projeto removido do banco local." });
     await loadData();
   };
 
@@ -152,13 +150,13 @@ export default function DashboardPage() {
       const changedCount = results.filter((r) => r.changed).length;
       setBanner({
         type: changedCount > 0 ? "success" : "info",
-        text: `Varredura concluída em ${results.length} projeto(s). ${changedCount} alteração(ões) detectada(s).`,
+        text: `${results.length} projeto(s) verificados · ${changedCount} atualização(ões).`,
       });
       await loadData();
     } catch (err) {
       setBanner({
         type: "error",
-        text: `Erro ao rodar monitor: ${err instanceof Error ? err.message : "erro"}`,
+        text: `Erro no monitor: ${err instanceof Error ? err.message : "erro"}`,
       });
     } finally {
       setIsRunningMonitor(false);
@@ -172,158 +170,128 @@ export default function DashboardPage() {
       setBanner({
         type: res.sent ? "success" : "info",
         text: res.sent
-          ? "Mensagem de teste enviada com sucesso no Telegram!"
-          : `Telegram não enviado: ${res.reason}`,
+          ? "Alerta de teste enviado no Telegram."
+          : `Telegram: ${res.reason}`,
       });
     } catch (err) {
       setBanner({
         type: "error",
-        text: `Erro ao testar Telegram: ${err instanceof Error ? err.message : "erro"}`,
+        text: `Erro no Telegram: ${err instanceof Error ? err.message : "erro"}`,
       });
     }
   };
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
-      <header className="flex flex-col gap-4 border-b border-border/80 pb-6 md:flex-row md:items-center md:justify-between">
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      {/* Minimal Header */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
-            <Sparkles className="h-3.5 w-3.5" />
-            Web3 Due Diligence &amp; Anti-Sybil Engine
-          </div>
-          <h1 className="mt-2.5 text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">
-            Airdrop Alpha Engine
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
+            Airdrop Alpha
           </h1>
-          <p className="mt-1 text-sm text-slate-400">
-            Triagem fundamentalista rigorosa (0–100), plano Anti-Sybil e alertas de roadmap no Telegram.
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Due diligence Web3 · Redes · Canais oficiais · Plano Anti-Sybil
           </p>
         </div>
 
-        {/* Status pills & quick actions */}
         <div className="flex flex-wrap items-center gap-2">
           {health && (
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs ${
-                health.gemini_configured
-                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                  : "border-amber-500/30 bg-amber-500/10 text-amber-300"
-              }`}
-            >
-              <Cpu className="h-3.5 w-3.5" />
-              {health.gemini_configured
-                ? `Gemini (${health.gemini_model})`
-                : "Modo Heurístico (sem GEMINI_API_KEY)"}
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-zinc-400">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  health.telegram_configured ? "bg-emerald-400" : "bg-zinc-600"
+                }`}
+              />
+              {health.gemini_configured ? "Gemini" : "Heurístico"}
             </span>
           )}
 
           <button
             onClick={handleTestTelegram}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-cyan-500/40 hover:text-cyan-300"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-600 hover:text-white"
           >
             <Send className="h-3.5 w-3.5" />
-            Testar Telegram
+            Telegram
           </button>
 
           <button
             onClick={handleRunAllMonitors}
             disabled={isRunningMonitor}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-emerald-500/40 hover:text-emerald-300 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-600 hover:text-white disabled:opacity-50"
           >
             <Radar
               className={`h-3.5 w-3.5 ${isRunningMonitor ? "animate-spin" : ""}`}
             />
-            Checar Roadmaps
+            Roadmaps
           </button>
         </div>
       </header>
 
+      {/* Inline KPI Strip */}
+      <section className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-border/80 py-3 text-xs text-zinc-500">
+        <span>
+          Auditados{" "}
+          <strong className="ml-1 font-mono-code text-zinc-100">
+            {stats?.total_projects ?? 0}
+          </strong>
+        </span>
+        <span>
+          Aprovados{" "}
+          <strong className="ml-1 font-mono-code text-emerald-400">
+            {stats?.approved_projects ?? 0}
+          </strong>
+        </span>
+        <span>
+          Tasks{" "}
+          <strong className="ml-1 font-mono-code text-zinc-100">
+            {stats?.completed_tasks ?? 0}/{stats?.total_tasks ?? 0}
+          </strong>
+        </span>
+        <span>
+          Updates{" "}
+          <strong className="ml-1 font-mono-code text-zinc-100">
+            {stats?.roadmap_alerts ?? 0}
+          </strong>
+        </span>
+      </section>
+
       {/* Banner */}
       {banner && (
         <div
-          className={`mt-5 flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm ${
+          className={`mt-4 flex items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5 text-xs ${
             banner.type === "error"
-              ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
+              ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
               : banner.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-              : "border-cyan-500/30 bg-cyan-500/10 text-cyan-200"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+              : "border-border bg-surface text-zinc-300"
           }`}
         >
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{banner.text}</span>
-          </div>
+          <span>{banner.text}</span>
           <button
             onClick={() => setBanner(null)}
-            className="text-xs opacity-70 hover:opacity-100"
+            className="text-zinc-500 hover:text-zinc-200"
           >
-            Fechar
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
 
-      {/* KPI Cards */}
-      <section className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="rounded-2xl border border-border bg-surface/80 p-4">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Projetos Auditados</span>
-            <Activity className="h-4 w-4 text-slate-500" />
-          </div>
-          <p className="mt-2 font-mono-code text-2xl font-bold text-slate-100">
-            {stats?.total_projects ?? 0}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface/80 p-4">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Alpha Aprovados (≥70)</span>
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-          </div>
-          <p className="mt-2 font-mono-code text-2xl font-bold text-emerald-400">
-            {stats?.approved_projects ?? 0}
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface/80 p-4">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Tasks Anti-Sybil</span>
-            <CheckCircle2 className="h-4 w-4 text-cyan-400" />
-          </div>
-          <p className="mt-2 font-mono-code text-2xl font-bold text-slate-100">
-            {stats?.completed_tasks ?? 0}
-            <span className="text-sm font-normal text-slate-500">
-              /{stats?.total_tasks ?? 0}
-            </span>
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-surface/80 p-4">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Updates de Roadmap</span>
-            <BellRing className="h-4 w-4 text-amber-400" />
-          </div>
-          <p className="mt-2 font-mono-code text-2xl font-bold text-slate-100">
-            {stats?.roadmap_alerts ?? 0}
-          </p>
-        </div>
-      </section>
-
       {/* Analyze Input */}
-      <section className="mt-6">
+      <section className="mt-5">
         <AnalyzeForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
       </section>
 
-      {/* Filters & Search */}
-      <section className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-surface/70 p-1">
+      {/* Filter & Search */}
+      <section className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-1">
           {VERDICT_TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setVerdictFilter(tab.id)}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                 verdictFilter === tab.id
-                  ? "bg-emerald-500/20 text-emerald-300"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-zinc-800 text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
               {tab.label}
@@ -331,34 +299,26 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div className="relative w-full sm:w-72">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+        <div className="relative w-full sm:w-64">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filtrar por nome, setor ou URL..."
-            className="w-full rounded-xl border border-border bg-surface/80 py-2 pl-9 pr-3 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-500/50 focus:outline-none"
+            placeholder="Buscar projeto ou rede..."
+            className="w-full rounded-lg border border-border bg-surface py-1.5 pl-8 pr-3 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-600 focus:outline-none"
           />
         </div>
       </section>
 
-      {/* Projects Grid */}
-      <section className="mt-5">
+      {/* Grid */}
+      <section className="mt-4">
         {projects.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-surface/40 p-12 text-center">
-            <Radar className="mx-auto h-10 w-10 text-slate-600" />
-            <h3 className="mt-3 text-base font-semibold text-slate-200">
-              Nenhum projeto analisado ainda
-            </h3>
-            <p className="mx-auto mt-1 max-w-md text-xs text-slate-400">
-              Insira a URL de um protocolo Web3 acima (site oficial ou GitBook) para rodar
-              a auditoria fundamentalista, consultar TVL/Funding no DefiLlama e gerar o
-              plano Anti-Sybil.
-            </p>
+          <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-zinc-500">
+            Nenhum projeto encontrado. Cole a URL de um protocolo acima para iniciar.
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {projects.map((proj) => (
               <ProjectCard
                 key={proj.id}
@@ -370,11 +330,12 @@ export default function DashboardPage() {
         )}
       </section>
 
-      {/* Project Detail Drawer */}
+      {/* Detail Drawer */}
       {selectedProject && (
         <ProjectDetailPanel
           project={selectedProject}
           onClose={() => setSelectedProject(null)}
+          onReanalyze={handleReanalyzeSelected}
           onToggleTask={handleToggleTask}
           onToggleMonitor={handleToggleMonitor}
           onCheckUpdates={handleCheckUpdates}
