@@ -18,6 +18,7 @@ const VERDICT_TABS = [
   { id: "ALL", label: "Todos" },
   { id: "APPROVED", label: "Aprovados" },
   { id: "WATCHLIST", label: "Watchlist" },
+  { id: "WAITLIST_REF", label: "Waitlist / Referral" },
   { id: "REJECTED", label: "Reprovados" },
 ] as const;
 
@@ -39,14 +40,19 @@ export default function DashboardPage() {
 
   const loadData = useCallback(async () => {
     try {
+      const apiVerdict = verdictFilter === "WAITLIST_REF" ? "ALL" : verdictFilter;
       const [h, s, list] = await Promise.all([
         api.health(),
         api.stats(),
-        api.listProjects({ verdict: verdictFilter, search: searchQuery }),
+        api.listProjects({ verdict: apiVerdict, search: searchQuery }),
       ]);
       setHealth(h);
       setStats(s);
-      setProjects(list);
+      setProjects(
+        verdictFilter === "WAITLIST_REF"
+          ? list.filter((p) => p.has_waitlist || p.has_referral)
+          : list
+      );
     } catch (err) {
       setBanner({
         type: "error",
@@ -95,6 +101,17 @@ export default function DashboardPage() {
       force_refresh: true,
     });
     setSelectedProject(detail);
+    await loadData();
+  };
+
+  const handleSaveReferral = async (payload: {
+    user_referral_link?: string;
+    waitlist_url?: string;
+  }) => {
+    if (!selectedProject) return;
+    const updated = await api.updateReferral(selectedProject.id, payload);
+    setSelectedProject(updated);
+    setBanner({ type: "success", text: "Waitlist / Referral salvo com sucesso." });
     await loadData();
   };
 
@@ -341,6 +358,7 @@ export default function DashboardPage() {
           project={selectedProject}
           onClose={() => setSelectedProject(null)}
           onReanalyze={handleReanalyzeSelected}
+          onSaveReferral={handleSaveReferral}
           onToggleTask={handleToggleTask}
           onToggleMonitor={handleToggleMonitor}
           onCheckUpdates={handleCheckUpdates}

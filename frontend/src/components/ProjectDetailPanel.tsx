@@ -31,6 +31,10 @@ interface ProjectDetailPanelProps {
   project: ProjectDetail;
   onClose: () => void;
   onReanalyze: (url: string, docsUrl?: string | null) => Promise<void>;
+  onSaveReferral: (payload: {
+    user_referral_link?: string;
+    waitlist_url?: string;
+  }) => Promise<void>;
   onToggleTask: (taskId: number, completed: boolean) => Promise<void>;
   onToggleMonitor: (enabled: boolean) => Promise<void>;
   onCheckUpdates: () => Promise<MonitorCheckResult | null>;
@@ -106,6 +110,7 @@ export function ProjectDetailPanel({
   project,
   onClose,
   onReanalyze,
+  onSaveReferral,
   onToggleTask,
   onToggleMonitor,
   onCheckUpdates,
@@ -114,9 +119,34 @@ export function ProjectDetailPanel({
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedRef, setCopiedRef] = useState(false);
+  const [refInput, setRefInput] = useState(project.user_referral_link || "");
+  const [waitlistInput, setWaitlistInput] = useState(project.waitlist_url || "");
+  const [savingRef, setSavingRef] = useState(false);
   const [lastCheckMsg, setLastCheckMsg] = useState<string | null>(null);
   const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const handleSaveRef = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingRef(true);
+    try {
+      await onSaveReferral({
+        user_referral_link: refInput,
+        waitlist_url: waitlistInput,
+      });
+    } finally {
+      setSavingRef(false);
+    }
+  };
+
+  const handleCopyRef = async () => {
+    const target = project.user_referral_link || refInput;
+    if (!target) return;
+    await navigator.clipboard.writeText(target);
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 2000);
+  };
 
   const attachedLinks: EcosystemLink[] =
     project.ecosystem_links && project.ecosystem_links.length > 0
@@ -465,6 +495,184 @@ export function ProjectDetailPanel({
                 </div>
               )}
             </div>
+          )}
+        </section>
+
+        {/* Waitlist & Referral */}
+        <section className="mt-7 border-t border-border pt-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+              Waitlist &amp; Referral
+            </h3>
+            <div className="flex items-center gap-2 text-[11px]">
+              <span
+                className={`rounded px-2 py-0.5 font-medium ${
+                  project.has_waitlist
+                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                    : "bg-elevated text-fg-muted"
+                }`}
+              >
+                {project.has_waitlist ? "Waitlist ativa" : "Sem waitlist"}
+              </span>
+              <span
+                className={`rounded px-2 py-0.5 font-medium ${
+                  project.has_referral
+                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                    : "bg-elevated text-fg-muted"
+                }`}
+              >
+                {project.has_referral ? "Com Referral" : "Sem referral"}
+              </span>
+            </div>
+          </div>
+
+          {project.waitlist_notes && (
+            <p className="mt-2 text-xs text-fg-secondary">{project.waitlist_notes}</p>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {project.waitlist_url && (
+              <a
+                href={project.waitlist_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-fg transition hover:border-border-strong"
+              >
+                Abrir Waitlist
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+            {project.referral_url && (
+              <a
+                href={project.referral_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-fg transition hover:border-border-strong"
+              >
+                Programa de Referral / Pontos
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+
+          <form
+            onSubmit={handleSaveRef}
+            className="mt-3 grid gap-2 rounded-lg border border-border bg-surface p-3 sm:grid-cols-2"
+          >
+            <div>
+              <label className="block text-[11px] text-fg-muted">
+                Seu link de Referral (salvo no projeto)
+              </label>
+              <div className="mt-1 flex gap-1.5">
+                <input
+                  type="text"
+                  value={refInput}
+                  onChange={(e) => setRefInput(e.target.value)}
+                  placeholder="https://projeto.xyz?ref=SEUCODIGO"
+                  className="w-full rounded-md border border-border bg-canvas px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+                />
+                {(project.user_referral_link || refInput) && (
+                  <button
+                    type="button"
+                    onClick={handleCopyRef}
+                    title="Copiar seu link de referral"
+                    className="rounded-md border border-border bg-canvas px-2 text-fg-secondary hover:text-fg"
+                  >
+                    {copiedRef ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-fg-muted">
+                Link da Waitlist (opcional)
+              </label>
+              <div className="mt-1 flex gap-1.5">
+                <input
+                  type="text"
+                  value={waitlistInput}
+                  onChange={(e) => setWaitlistInput(e.target.value)}
+                  placeholder="https://projeto.xyz/waitlist"
+                  className="w-full rounded-md border border-border bg-canvas px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={savingRef}
+                  className="shrink-0 rounded-md bg-btn px-3 py-1.5 text-xs font-medium text-btn-fg transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingRef ? "..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        {/* Roadmap do Projeto */}
+        <section className="mt-7 border-t border-border pt-6">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+              Roadmap do Projeto
+            </h3>
+            {project.roadmap_url && (
+              <a
+                href={project.roadmap_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-fg-secondary hover:text-fg"
+              >
+                Ver fonte oficial
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+
+          <p className="mt-2 text-xs text-fg-secondary">{project.roadmap_summary}</p>
+
+          {project.roadmap_milestones && project.roadmap_milestones.length > 0 ? (
+            <div className="mt-4 space-y-3 border-l border-border pl-4">
+              {project.roadmap_milestones.map((m, idx) => {
+                const statusDot =
+                  m.status === "DONE"
+                    ? "bg-emerald-500 dark:bg-emerald-400"
+                    : m.status === "IN_PROGRESS"
+                    ? "bg-amber-500 dark:bg-amber-400"
+                    : "bg-fg-muted";
+                const statusLabel =
+                  m.status === "DONE"
+                    ? "Concluído"
+                    : m.status === "IN_PROGRESS"
+                    ? "Em andamento"
+                    : "Próximo";
+                return (
+                  <div key={idx} className="relative rounded-lg border border-border bg-surface p-3">
+                    <span
+                      className={`absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full ring-4 ring-canvas ${statusDot}`}
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono-code text-[11px] font-semibold text-fg-muted">
+                        {m.phase}
+                      </span>
+                      <span className="text-[10px] font-medium text-fg-muted">
+                        {statusLabel}
+                      </span>
+                    </div>
+                    <h4 className="mt-1 text-xs font-semibold text-fg">{m.title}</h4>
+                    {m.details && (
+                      <p className="mt-1 text-xs text-fg-secondary">{m.details}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-fg-muted">
+              Clique no botão de reanalisar (↻) no topo para extrair as fases do roadmap deste projeto.
+            </p>
           )}
         </section>
 

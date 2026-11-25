@@ -39,12 +39,12 @@ export function ThemeToggle() {
       {theme === "dark" ? (
         <>
           <Sun className="h-3.5 w-3.5 text-amber-400" />
-          <span className="hidden sm:inline">Claro</span>
+          <span>Tema Claro</span>
         </>
       ) : (
         <>
           <Moon className="h-3.5 w-3.5 text-fg-secondary" />
-          <span className="hidden sm:inline">Escuro</span>
+          <span>Tema Escuro</span>
         </>
       )}
     </button>

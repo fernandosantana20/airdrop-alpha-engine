@@ -91,6 +91,14 @@ class Project(Base):
     bull_case = Column(JSON, default=list, nullable=False)
     red_flags = Column(JSON, default=list, nullable=False)
     roadmap_summary = Column(Text, nullable=False, default="")
+    roadmap_url = Column(String(500), nullable=True)
+    roadmap_milestones = Column(JSON, default=list, nullable=False)
+    has_waitlist = Column(Boolean, default=False, nullable=False)
+    waitlist_url = Column(String(500), nullable=True)
+    has_referral = Column(Boolean, default=False, nullable=False)
+    referral_url = Column(String(500), nullable=True)
+    user_referral_link = Column(String(500), nullable=True)
+    waitlist_notes = Column(Text, nullable=False, default="")
     anti_sybil_strategy = Column(Text, nullable=False, default="")
 
     # Monitoring state
@@ -164,10 +172,19 @@ def init_db() -> None:
     inspector = inspect(engine)
     if "projects" in inspector.get_table_names():
         existing_cols = {c["name"] for c in inspector.get_columns("projects")}
+        json_type = "JSON" if not db_url.startswith("sqlite") else "TEXT"
         migrations = [
             ("instagram_url", "VARCHAR(500)"),
-            ("ecosystem_links", "JSON" if not db_url.startswith("sqlite") else "TEXT"),
-            ("chain_tvls", "JSON" if not db_url.startswith("sqlite") else "TEXT"),
+            ("ecosystem_links", json_type),
+            ("chain_tvls", json_type),
+            ("roadmap_url", "VARCHAR(500)"),
+            ("roadmap_milestones", json_type),
+            ("has_waitlist", "BOOLEAN DEFAULT FALSE"),
+            ("waitlist_url", "VARCHAR(500)"),
+            ("has_referral", "BOOLEAN DEFAULT FALSE"),
+            ("referral_url", "VARCHAR(500)"),
+            ("user_referral_link", "VARCHAR(500)"),
+            ("waitlist_notes", "TEXT DEFAULT ''"),
         ]
         with engine.begin() as conn:
             for col_name, col_type in migrations:

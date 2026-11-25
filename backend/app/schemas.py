@@ -74,6 +74,13 @@ class StrategicTaskSchema(BaseModel):
     )
 
 
+class RoadmapMilestone(BaseModel):
+    phase: str = Field(..., description="Phase or timeframe, e.g. 'Fase 1', 'Q1 2026', 'Testnet'")
+    title: str = Field(..., description="Short milestone title")
+    status: Literal["DONE", "IN_PROGRESS", "UPCOMING"] = Field(default="UPCOMING")
+    details: str = Field(default="", description="Brief explanation of the milestone")
+
+
 class DueDiligenceReport(BaseModel):
     project_name: str = Field(..., description="Official project name")
     category: str = Field(
@@ -105,6 +112,10 @@ class DueDiligenceReport(BaseModel):
     roadmap_summary: str = Field(
         ...,
         description="Summary of current development stage, mainnet/TGE timeline, and roadmap signals",
+    )
+    roadmap_milestones: List[RoadmapMilestone] = Field(
+        default_factory=list,
+        description="3-6 structured roadmap milestones (past, current, upcoming) extracted from site/docs",
     )
     anti_sybil_strategy: str = Field(
         ...,
@@ -139,6 +150,11 @@ class TaskToggleRequest(BaseModel):
 class MonitorToggleRequest(BaseModel):
     monitoring_enabled: bool
     monitored_url: Optional[HttpUrl] = None
+
+
+class UpdateReferralRequest(BaseModel):
+    user_referral_link: Optional[str] = None
+    waitlist_url: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +223,10 @@ class ProjectListItem(BaseModel):
     tasks_total: int = 0
     tasks_completed: int = 0
     alerts_count: int = 0
+    has_waitlist: bool = False
+    has_referral: bool = False
+    waitlist_url: Optional[str] = None
+    user_referral_link: Optional[str] = None
 
 
 class ProjectDetailResponse(BaseModel):
@@ -227,10 +247,20 @@ class ProjectDetailResponse(BaseModel):
     chains: List[str] = Field(default_factory=list)
     chain_tvls: Dict[str, float] = Field(default_factory=dict)
 
-    @field_validator("ecosystem_links", "chains", "investors", "bull_case", "red_flags", mode="before")
+    @field_validator("ecosystem_links", "chains", "investors", "bull_case", "red_flags", "roadmap_milestones", mode="before")
     @classmethod
     def _coerce_none_list(cls, v):
         return [] if v is None else v
+
+    @field_validator("waitlist_notes", mode="before")
+    @classmethod
+    def _coerce_none_str(cls, v):
+        return "" if v is None else v
+
+    @field_validator("has_waitlist", "has_referral", mode="before")
+    @classmethod
+    def _coerce_none_bool(cls, v):
+        return False if v is None else bool(v)
 
     @field_validator("chain_tvls", "score_breakdown", mode="before")
     @classmethod
@@ -251,6 +281,14 @@ class ProjectDetailResponse(BaseModel):
     bull_case: List[str] = Field(default_factory=list)
     red_flags: List[str] = Field(default_factory=list)
     roadmap_summary: str
+    roadmap_url: Optional[str] = None
+    roadmap_milestones: List[RoadmapMilestone] = Field(default_factory=list)
+    has_waitlist: bool = False
+    waitlist_url: Optional[str] = None
+    has_referral: bool = False
+    referral_url: Optional[str] = None
+    user_referral_link: Optional[str] = None
+    waitlist_notes: str = ""
     anti_sybil_strategy: str
     monitored_url: Optional[str] = None
     monitoring_enabled: bool

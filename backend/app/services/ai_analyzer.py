@@ -6,7 +6,7 @@ import logging
 from typing import List, Tuple
 
 from app.config import get_settings
-from app.schemas import DueDiligenceReport, ScoreBreakdown, StrategicTaskSchema
+from app.schemas import DueDiligenceReport, RoadmapMilestone, ScoreBreakdown, StrategicTaskSchema
 from app.services.onchain_data import OnChainMetrics
 from app.services.scraper import ScrapedProjectData
 
@@ -345,6 +345,77 @@ Notes: {' | '.join(onchain.source_notes)}
                 ),
             ]
 
+        # Build structured roadmap milestones from scraped text or live protocol lifecycle signals
+        milestones: List[RoadmapMilestone] = []
+        if scraped.extracted_milestones:
+            for m in scraped.extracted_milestones[:6]:
+                milestones.append(
+                    RoadmapMilestone(
+                        phase=m["phase"],
+                        title=m["title"],
+                        status=m["status"] if m["status"] in {"DONE", "IN_PROGRESS", "UPCOMING"} else "UPCOMING",
+                        details=m.get("details", ""),
+                    )
+                )
+        else:
+            if onchain.funding_rounds or onchain.investors:
+                milestones.append(
+                    RoadmapMilestone(
+                        phase="Fase 1 · Backing",
+                        title="Captação & Investidores Institucionais",
+                        status="DONE",
+                        details=f"Backers identificados: {', '.join(onchain.investors[:5]) or 'Rodada registrada no DefiLlama'}.",
+                    )
+                )
+            if onchain.audits_count > 0 or onchain.audit_links:
+                milestones.append(
+                    RoadmapMilestone(
+                        phase="Fase 2 · Segurança",
+                        title="Auditorias de Contratos Inteligentes",
+                        status="DONE",
+                        details=f"{max(onchain.audits_count, len(onchain.audit_links))} auditoria(s) verificada(s).",
+                    )
+                )
+            if onchain.tvl_usd and onchain.tvl_usd > 0:
+                milestones.append(
+                    RoadmapMilestone(
+                        phase="Fase 3 · Mainnet",
+                        title="Protocolo em Produção com TVL Ativo",
+                        status="IN_PROGRESS",
+                        details=f"TVL atual de ${onchain.tvl_usd:,.0f} em {', '.join(onchain.chains[:4]) or 'rede principal'}.",
+                    )
+                )
+            else:
+                milestones.append(
+                    RoadmapMilestone(
+                        phase="Fase 3 · Early Access",
+                        title="Testnet / Waitlist & Onboarding Inicial",
+                        status="IN_PROGRESS",
+                        details="Projeto pré-TVL ou em fase inicial de testes/waitlist.",
+                    )
+                )
+            if scraped.has_waitlist or scraped.has_referral:
+                milestones.append(
+                    RoadmapMilestone(
+                        phase="Fase 4 · Crescimento",
+                        title="Campanha de Waitlist / Pontos / Referral",
+                        status="IN_PROGRESS",
+                        details=scraped.waitlist_notes,
+                    )
+                )
+            milestones.append(
+                RoadmapMilestone(
+                    phase="Fase 5 · Token / TGE",
+                    title="Token Generation Event (TGE) & Airdrop" if not onchain.token_symbol else f"Expansão Pós-TGE ({onchain.token_symbol})",
+                    status="UPCOMING" if not onchain.token_symbol else "DONE",
+                    details=(
+                        "Token ainda não listado — monitorando docs/roadmap para anúncio de snapshot e TGE."
+                        if not onchain.token_symbol
+                        else f"Token {onchain.token_symbol} já ativo; acompanhar novas temporadas de incentivos."
+                    ),
+                )
+            )
+
         report = DueDiligenceReport(
             project_name=name,
             category=category,
@@ -364,6 +435,7 @@ Notes: {' | '.join(onchain.source_notes)}
                 if scraped.monitored_url
                 else "Nenhuma página de roadmap dedicada identificada automaticamente."
             ),
+            roadmap_milestones=milestones,
             anti_sybil_strategy=(
                 "Priorize consistência temporal (3+ meses ativos), valores não-redondos, uso de bridge oficial e retenção de liquidez acima de 14 dias."
                 if total >= 70

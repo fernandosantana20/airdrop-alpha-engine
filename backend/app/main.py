@@ -23,6 +23,7 @@ from app.schemas import (
     ProjectListItem,
     TaskResponse,
     TaskToggleRequest,
+    UpdateReferralRequest,
 )
 from app.services.ai_analyzer import AIDueDiligenceAnalyzer
 from app.services.monitor import RoadmapMonitor
@@ -163,6 +164,10 @@ def list_projects(
                 tasks_total=len(p.tasks),
                 tasks_completed=sum(1 for t in p.tasks if t.completed),
                 alerts_count=len(p.roadmap_snapshots),
+                has_waitlist=bool(p.has_waitlist),
+                has_referral=bool(p.has_referral or p.user_referral_link),
+                waitlist_url=p.waitlist_url,
+                user_referral_link=p.user_referral_link,
             )
         )
     return items
@@ -248,6 +253,8 @@ async def analyze_project(
     _add_eco("GitHub", "github", project.github_url)
     _add_eco("Documentação / Docs", "docs", project.docs_url)
     _add_eco("Roadmap", "roadmap", scraped.roadmap_url)
+    _add_eco("Waitlist / Early Access", "waitlist", scraped.waitlist_url)
+    _add_eco("Programa de Referral / Pontos", "referral", scraped.referral_url)
     if onchain.slug:
         _add_eco("DefiLlama", "analytics", f"https://defillama.com/protocol/{onchain.slug}")
     for idx, audit_u in enumerate(onchain.audit_links[:4], start=1):
@@ -284,6 +291,13 @@ async def analyze_project(
     project.bull_case = report.bull_case
     project.red_flags = report.red_flags
     project.roadmap_summary = report.roadmap_summary
+    project.roadmap_url = scraped.roadmap_url
+    project.roadmap_milestones = [m.model_dump() for m in report.roadmap_milestones]
+    project.has_waitlist = scraped.has_waitlist
+    project.waitlist_url = scraped.waitlist_url or project.waitlist_url
+    project.has_referral = scraped.has_referral or bool(project.user_referral_link)
+    project.referral_url = scraped.referral_url
+    project.waitlist_notes = scraped.waitlist_notes
     project.anti_sybil_strategy = report.anti_sybil_strategy
 
     project.monitored_url = scraped.monitored_url
@@ -352,6 +366,30 @@ def update_monitoring(
     project.monitoring_enabled = payload.monitoring_enabled
     if payload.monitored_url:
         project.monitored_url = normalize_url(str(payload.monitored_url))
+    db.commit()
+    db.refresh(project)
+    return ProjectDetailResponse.model_validate(project)
+
+
+@app.patch("/api/projects/{project_id}/referral", response_model=ProjectDetailResponse)
+def update_project_referral(
+    project_id: int,
+    payload: UpdateReferralRequest,
+    db: Session = Depends(get_db),
+) -> ProjectDetailResponse:
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if payload.user_referral_link is not None:
+        cleaned_ref = payload.user_referral_link.strip()
+        project.user_referral_link = cleaned_ref or None
+        if cleaned_ref:
+            project.has_referral = True
+    if payload.waitlist_url is not None:
+        cleaned_wl = payload.waitlist_url.strip()
+        project.waitlist_url = cleaned_wl or None
+        if cleaned_wl:
+            project.has_waitlist = True
     db.commit()
     db.refresh(project)
     return ProjectDetailResponse.model_validate(project)

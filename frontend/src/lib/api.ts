@@ -102,6 +102,15 @@ export const api = {
       }),
     }),
 
+  updateReferral: (
+    projectId: number,
+    payload: { user_referral_link?: string; waitlist_url?: string }
+  ) =>
+    request<ProjectDetail>(`/api/projects/${projectId}/referral`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
   checkProjectUpdates: (projectId: number) =>
     request<MonitorCheckResult>(`/api/projects/${projectId}/check-updates`, {
       method: "POST",

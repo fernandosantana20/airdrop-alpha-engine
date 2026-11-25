@@ -64,12 +64,12 @@ export function ProjectCard({ project, onSelect }: ProjectCardProps) {
         </div>
       </div>
 
-      {/* Networks */}
+      {/* Networks & Waitlist/Referral badges */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <Layers className="h-3.5 w-3.5 text-fg-muted shrink-0" />
         {project.chains.length > 0 ? (
           <>
-            {project.chains.slice(0, 4).map((chain) => (
+            {project.chains.slice(0, 3).map((chain) => (
               <span
                 key={chain}
                 className="rounded border border-border bg-canvas px-2 py-0.5 text-[11px] text-fg-secondary"
@@ -77,14 +77,24 @@ export function ProjectCard({ project, onSelect }: ProjectCardProps) {
                 {chain}
               </span>
             ))}
-            {project.chains.length > 4 && (
+            {project.chains.length > 3 && (
               <span className="text-[11px] text-fg-muted">
-                +{project.chains.length - 4}
+                +{project.chains.length - 3}
               </span>
             )}
           </>
         ) : (
           <span className="text-[11px] text-fg-muted">Rede não especificada</span>
+        )}
+        {project.has_waitlist && (
+          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+            Waitlist
+          </span>
+        )}
+        {project.has_referral && (
+          <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+            Referral
+          </span>
         )}
       </div>
 

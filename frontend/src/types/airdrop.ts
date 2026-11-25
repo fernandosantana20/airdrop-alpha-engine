@@ -6,6 +6,13 @@ export interface EcosystemLink {
   url: string;
 }
 
+export interface RoadmapMilestone {
+  phase: string;
+  title: string;
+  status: "DONE" | "IN_PROGRESS" | "UPCOMING" | string;
+  details: string;
+}
+
 export interface ScoreBreakdown {
   product_utility: number;
   backing_funding: number;
@@ -64,6 +71,10 @@ export interface ProjectListItem {
   tasks_total: number;
   tasks_completed: number;
   alerts_count: number;
+  has_waitlist: boolean;
+  has_referral: boolean;
+  waitlist_url: string | null;
+  user_referral_link: string | null;
 }
 
 export interface ProjectDetail {
@@ -96,6 +107,14 @@ export interface ProjectDetail {
   bull_case: string[];
   red_flags: string[];
   roadmap_summary: string;
+  roadmap_url: string | null;
+  roadmap_milestones: RoadmapMilestone[];
+  has_waitlist: boolean;
+  waitlist_url: string | null;
+  has_referral: boolean;
+  referral_url: string | null;
+  user_referral_link: string | null;
+  waitlist_notes: string;
   anti_sybil_strategy: string;
   monitored_url: string | null;
   monitoring_enabled: boolean;

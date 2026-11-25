@@ -50,6 +50,12 @@ class ScrapedProjectData:
     instagram_url: Optional[str] = None
     extra_links: List[Dict[str, str]] = field(default_factory=list)
     detected_chains: List[str] = field(default_factory=list)
+    waitlist_url: Optional[str] = None
+    referral_url: Optional[str] = None
+    has_waitlist: bool = False
+    has_referral: bool = False
+    waitlist_notes: str = ""
+    extracted_milestones: List[Dict[str, str]] = field(default_factory=list)
     github_metrics: Optional[GitHubMetrics] = None
     monitored_url: str = ""
     content_hash: str = ""
@@ -135,6 +141,79 @@ def detect_chains_in_text(text: str) -> List[str]:
     return found
 
 
+def detect_waitlist_and_referral(
+    text: str, waitlist_url: Optional[str], referral_url: Optional[str]
+) -> Tuple[bool, bool, str]:
+    low = text.lower()
+    has_waitlist = bool(waitlist_url) or bool(
+        re.search(
+            r"\bwaitlist\b|\bwhitelist\b|\bearly access\b|\bpre-register\b|\bjoin the waitlist\b|\bget early access\b",
+            low,
+        )
+    )
+    has_referral = bool(referral_url) or bool(
+        re.search(
+            r"\breferral\b|\binvite code\b|\binvite friends\b|\brefer friends\b|\breferral program\b|\bref code\b|\baffiliate\b",
+            low,
+        )
+    )
+    notes: List[str] = []
+    if has_waitlist:
+        notes.append("Waitlist / Early Access detectada no projeto.")
+    if has_referral:
+        notes.append("Programa de Referral / Convite detectado (oportunidade de pontos extras por indicação).")
+    if not notes:
+        notes.append("Nenhuma waitlist ou programa de referral explícito detectado automaticamente.")
+    return has_waitlist, has_referral, " ".join(notes)
+
+
+def extract_roadmap_milestones(text: str) -> List[Dict[str, str]]:
+    """Extract structured roadmap phases/milestones from scraped roadmap/docs/site text."""
+    milestones: List[Dict[str, str]] = []
+    seen_titles: set[str] = set()
+
+    phase_pattern = re.compile(
+        r"\b((?:Q[1-4]\s*202[4-7])|(?:Phase\s*[1-6])|(?:Fase\s*[1-6])|(?:Stage\s*[1-5])|(?:Season\s*[1-5])|(?:Epoch\s*[1-5])|(?:V[1-3]\b))",
+        re.IGNORECASE,
+    )
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if len(line) < 12 or len(line) > 220:
+            continue
+        m = phase_pattern.search(line)
+        if not m:
+            continue
+        phase = m.group(1).strip().title()
+        # Clean title
+        rest = re.sub(phase_pattern, "", line, count=1).strip(" :-—•|")
+        title = (rest[:80] if rest else line[:80]).strip()
+        if not title or title.lower() in seen_titles:
+            continue
+        seen_titles.add(title.lower())
+
+        low_line = line.lower()
+        if any(k in low_line for k in ("completed", "launched", "live", "done", "concluído", "2024")):
+            status = "DONE"
+        elif any(k in low_line for k in ("current", "active", "in progress", "testnet", "season", "live now")):
+            status = "IN_PROGRESS"
+        else:
+            status = "UPCOMING"
+
+        milestones.append(
+            {
+                "phase": phase,
+                "title": title,
+                "status": status,
+                "details": line[:200],
+            }
+        )
+        if len(milestones) >= 6:
+            break
+
+    return milestones
+
+
 def extract_clean_text_from_html(html: str, max_chars: int = 14000) -> Tuple[str, str, str]:
     soup = BeautifulSoup(html, "html.parser")
 
@@ -196,6 +275,8 @@ class Web3Scraper:
             "discord": None,
             "telegram": None,
             "instagram": None,
+            "waitlist": None,
+            "referral": None,
         }
         extras: List[Dict[str, str]] = []
         seen_extra: set[str] = set()
@@ -259,6 +340,28 @@ class Web3Scraper:
                 or "milestones" in anchor_text
             ):
                 links["roadmap"] = full_url
+
+            if not links["waitlist"] and (
+                "waitlist" in lower_url
+                or "whitelist" in lower_url
+                or "early-access" in lower_url
+                or "waitlist" in anchor_text
+                or "early access" in anchor_text
+                or "join waitlist" in anchor_text
+            ):
+                links["waitlist"] = full_url
+
+            if not links["referral"] and (
+                "referral" in lower_url
+                or "invite" in lower_url
+                or "/points" in lower_url
+                or "/rewards" in lower_url
+                or "referral" in anchor_text
+                or "invite" in anchor_text
+                or "points" in anchor_text
+            ):
+                if "discord.com/invite" not in lower_url:
+                    links["referral"] = full_url
 
             # Capture additional ecosystem channels
             for label, kind, match_fn in (
@@ -437,6 +540,8 @@ class Web3Scraper:
                 ("discord", "discord_url"),
                 ("telegram", "telegram_url"),
                 ("instagram", "instagram_url"),
+                ("waitlist", "waitlist_url"),
+                ("referral", "referral_url"),
             ):
                 if not getattr(result, attr) and discovered_map.get(key):
                     setattr(result, attr, discovered_map[key])
@@ -518,8 +623,20 @@ class Web3Scraper:
                     client, result.github_url
                 )
 
-        result.detected_chains = detect_chains_in_text(
-            f"{result.title} {result.meta_description} {result.main_text[:5000]} {result.docs_text[:4000]}"
+        combined_for_signals = (
+            f"{result.title}\n{result.meta_description}\n{result.roadmap_text[:4000]}\n"
+            f"{result.main_text[:5000]}\n{result.docs_text[:4000]}"
+        )
+        result.detected_chains = detect_chains_in_text(combined_for_signals)
+        (
+            result.has_waitlist,
+            result.has_referral,
+            result.waitlist_notes,
+        ) = detect_waitlist_and_referral(
+            combined_for_signals, result.waitlist_url, result.referral_url
+        )
+        result.extracted_milestones = extract_roadmap_milestones(
+            f"{result.roadmap_text}\n{result.docs_text}\n{result.main_text}"
         )
 
         # Decide best URL to monitor for future roadmap/docs updates
