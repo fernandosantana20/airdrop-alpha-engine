@@ -87,10 +87,12 @@ Telegram: {scraped.telegram_url or 'Not found'}
 === DEFILLAMA ON-CHAIN & FUNDING METRICS ===
 Matched Protocol: {onchain.matched_protocol or 'None'}
 Category: {onchain.category or 'Unknown'}
+Protocol Description: {onchain.description or 'N/A'}
 Chains: {', '.join(onchain.chains) if onchain.chains else 'None indexed'}
 TVL (USD): {f"${onchain.tvl_usd:,.2f}" if onchain.tvl_usd is not None else 'N/A'}
 TVL 7d Change (%): {f"{onchain.tvl_change_7d:.2f}%" if onchain.tvl_change_7d is not None else 'N/A'}
 Existing Token Symbol: {onchain.token_symbol or 'None detected (potentially tokenless)'}
+Verified Audits: {onchain.audits_count} ({', '.join(onchain.audit_links[:3]) if onchain.audit_links else 'No audit links indexed'})
 Total Funding (USD): {f"${onchain.total_funding_usd:,.2f}" if onchain.total_funding_usd is not None else 'N/A'}
 Investors: {', '.join(onchain.investors[:15]) if onchain.investors else 'None indexed'}
 Funding Rounds:
@@ -190,7 +192,9 @@ Notes: {' | '.join(onchain.source_notes)}
             else:
                 funding = 9
         elif len(onchain.investors) >= 3:
-            funding = 13
+            funding = 15
+        elif len(onchain.investors) >= 1 or len(onchain.funding_rounds) >= 1:
+            funding = 12
 
         # 3. TVL & traction (0-20)
         tvl_score = 4
@@ -227,9 +231,12 @@ Notes: {' | '.join(onchain.source_notes)}
 
         # 6. Security & rug resistance (0-10)
         security = 4
-        if any(k in combined_text for k in ("audit", "audits", "certik", "trail of bits", "openzeppelin", "spearbit", "bug bounty", "immunefi")):
+        if onchain.audits_count > 0 or onchain.audit_links or any(
+            k in combined_text
+            for k in ("audit", "audits", "certik", "trail of bits", "openzeppelin", "spearbit", "bug bounty", "immunefi")
+        ):
             security += 3
-        if scraped.docs_url:
+        if scraped.docs_url or onchain.audit_links:
             security += 2
         if scraped.twitter_url and (scraped.discord_url or scraped.telegram_url):
             security += 1
@@ -261,8 +268,17 @@ Notes: {' | '.join(onchain.source_notes)}
             bull_case.append(
                 f"Funding público de ${onchain.total_funding_usd / 1_000_000:.2f}M com {len(onchain.investors)} investidor(es) listados."
             )
+        elif onchain.investors or onchain.funding_rounds:
+            bull_case.append(
+                f"Rodada(s) de funding confirmadas no DefiLlama (backers: {', '.join(onchain.investors[:5]) or 'não divulgado'})."
+            )
         else:
             red_flags.append("Nenhuma rodada de funding encontrada na base pública do DefiLlama.")
+
+        if onchain.audits_count > 0 or onchain.audit_links:
+            bull_case.append(
+                f"{max(onchain.audits_count, len(onchain.audit_links))} auditoria(s) de segurança indexada(s) no DefiLlama."
+            )
 
         if scraped.github_url or onchain.defillama_github:
             bull_case.append("Presença verificável no GitHub com código aberto.")

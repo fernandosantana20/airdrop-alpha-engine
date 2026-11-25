@@ -282,6 +282,57 @@ class Web3Scraper:
 
         return GitHubMetrics(url=github_url, summary="GitHub link found (API rate-limited or private)")
 
+    async def fetch_jina_markdown(
+        self, client: httpx.AsyncClient, url: str
+    ) -> Optional[str]:
+        """Fallback renderer for JS-heavy SPAs using Jina Reader (returns clean Markdown)."""
+        try:
+            resp = await client.get(
+                f"https://r.jina.ai/{url}",
+                headers={"Accept": "text/plain", "User-Agent": USER_AGENT},
+                follow_redirects=True,
+                timeout=14.0,
+            )
+            if resp.status_code == 200 and len(resp.text.strip()) > 120:
+                return resp.text[:14000]
+        except Exception as exc:
+            logger.debug("Jina Reader fallback failed for %s: %s", url, exc)
+        return None
+
+    def _discover_links_from_text(self, text: str) -> Dict[str, Optional[str]]:
+        """Extract docs, github, twitter, discord, telegram URLs from Markdown/plain text."""
+        found: Dict[str, Optional[str]] = {
+            "docs": None,
+            "roadmap": None,
+            "github": None,
+            "twitter": None,
+            "discord": None,
+            "telegram": None,
+        }
+        urls = re.findall(r"https?://[^\s\)\]\>\"']+", text)
+        for u in urls:
+            u = u.rstrip(".,;:")
+            low = u.lower()
+            if not found["github"] and "github.com/" in low:
+                parts = [p for p in urlparse(u).path.split("/") if p]
+                if parts:
+                    found["github"] = f"https://github.com/{'/'.join(parts[:2])}"
+            if not found["twitter"] and ("twitter.com/" in low or "x.com/" in low):
+                if "/intent/" not in low and "/share" not in low:
+                    found["twitter"] = u
+            if not found["discord"] and ("discord.gg/" in low or "discord.com/invite" in low):
+                found["discord"] = u
+            if not found["telegram"] and ("t.me/" in low or "telegram.me/" in low):
+                found["telegram"] = u
+            if not found["docs"] and (
+                "docs." in low or "gitbook.io" in low or "/docs" in low
+            ):
+                if "github.com" not in low:
+                    found["docs"] = u
+            if not found["roadmap"] and ("roadmap" in low or "tokenomics" in low):
+                found["roadmap"] = u
+        return found
+
     async def scrape_project(
         self, url: str, explicit_docs_url: Optional[str] = None
     ) -> ScrapedProjectData:
@@ -316,8 +367,67 @@ class Web3Scraper:
                 result.discord_url = discovered["discord"]
                 result.telegram_url = discovered["telegram"]
 
+            # If user pasted an app.* / trade.* subdomain, also probe the root landing domain
+            root_url = f"https://{domain}"
+            if root_url != normalized and len(result.main_text) < 500:
+                root_html, _ = await self.fetch_html(client, root_url)
+                if root_html:
+                    r_title, r_meta, r_text = extract_clean_text_from_html(root_html)
+                    if len(r_text) > len(result.main_text):
+                        result.main_text = r_text
+                        result.title = result.title or r_title
+                        result.meta_description = result.meta_description or r_meta
+                    r_links = self._discover_links(root_html, root_url)
+                    for key, attr in (
+                        ("docs", "docs_url"),
+                        ("roadmap", "roadmap_url"),
+                        ("github", "github_url"),
+                        ("twitter", "twitter_url"),
+                        ("discord", "discord_url"),
+                        ("telegram", "telegram_url"),
+                    ):
+                        if not getattr(result, attr) and r_links[key]:
+                            setattr(result, attr, r_links[key])
+
+            # SPA fallback: if raw HTML had almost no readable text, render via Jina Reader
+            if len(result.main_text) < 300:
+                jina_target = root_url if root_url != normalized else normalized
+                md_text = await self.fetch_jina_markdown(client, jina_target)
+                if md_text:
+                    result.main_text = clean_text_for_hash(md_text)[:12000]
+                    md_links = self._discover_links_from_text(md_text)
+                    for key, attr in (
+                        ("docs", "docs_url"),
+                        ("roadmap", "roadmap_url"),
+                        ("github", "github_url"),
+                        ("twitter", "twitter_url"),
+                        ("discord", "discord_url"),
+                        ("telegram", "telegram_url"),
+                    ):
+                        if not getattr(result, attr) and md_links[key]:
+                            setattr(result, attr, md_links[key])
+
+            # Probe docs.<domain> automatically if docs_url is still unknown
+            if not result.docs_url and domain:
+                candidate_docs = f"https://docs.{domain}"
+                docs_html, _ = await self.fetch_html(client, candidate_docs)
+                if docs_html:
+                    _, _, docs_text = extract_clean_text_from_html(docs_html, max_chars=12000)
+                    if len(docs_text) > 150:
+                        result.docs_url = candidate_docs
+                        result.docs_text = docs_text
+                        docs_links = self._discover_links(docs_html, candidate_docs)
+                        if not result.github_url and docs_links["github"]:
+                            result.github_url = docs_links["github"]
+                        if not result.roadmap_url and docs_links["roadmap"]:
+                            result.roadmap_url = docs_links["roadmap"]
+                        if not result.twitter_url and docs_links["twitter"]:
+                            result.twitter_url = docs_links["twitter"]
+                        if not result.discord_url and docs_links["discord"]:
+                            result.discord_url = docs_links["discord"]
+
             # Scrape Docs / GitBook if discovered or provided
-            if result.docs_url and result.docs_url != normalized:
+            if result.docs_url and not result.docs_text and result.docs_url != normalized:
                 docs_html, docs_err = await self.fetch_html(client, result.docs_url)
                 if docs_err:
                     result.warnings.append(docs_err)
