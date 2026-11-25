@@ -37,7 +37,9 @@ class Settings(BaseSettings):
         )
         if raw:
             if raw.startswith("postgres://"):
-                raw = "postgresql://" + raw[len("postgres://") :]
+                raw = "postgresql+psycopg://" + raw[len("postgres://") :]
+            elif raw.startswith("postgresql://"):
+                raw = "postgresql+psycopg://" + raw[len("postgresql://") :]
             return raw
         if self.is_vercel:
             return "sqlite:////tmp/airdrop_alpha.db"
