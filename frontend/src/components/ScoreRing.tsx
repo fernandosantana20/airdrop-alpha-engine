@@ -12,12 +12,19 @@ export function ScoreRing({ score, size = 64, strokeWidth = 5 }: ScoreRingProps)
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (clamped / 100) * circumference;
 
-  const colorClass =
+  const strokeClass =
     clamped >= 70
-      ? "stroke-emerald-400 text-emerald-400"
+      ? "stroke-emerald-600 dark:stroke-emerald-400"
       : clamped >= 50
-      ? "stroke-amber-400 text-amber-400"
-      : "stroke-rose-400 text-rose-400";
+      ? "stroke-amber-600 dark:stroke-amber-400"
+      : "stroke-rose-600 dark:stroke-rose-400";
+
+  const textClass =
+    clamped >= 70
+      ? "text-emerald-600 dark:text-emerald-400"
+      : clamped >= 50
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-rose-600 dark:text-rose-400";
 
   return (
     <div
@@ -31,7 +38,7 @@ export function ScoreRing({ score, size = 64, strokeWidth = 5 }: ScoreRingProps)
           r={radius}
           fill="none"
           strokeWidth={strokeWidth}
-          className="stroke-slate-800"
+          className="stroke-track"
         />
         <circle
           cx={size / 2}
@@ -42,13 +49,13 @@ export function ScoreRing({ score, size = 64, strokeWidth = 5 }: ScoreRingProps)
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          className={`transition-all duration-700 ${colorClass.split(" ")[0]}`}
+          className={`transition-all duration-700 ${strokeClass}`}
         />
       </svg>
       <span
         className={`absolute font-mono-code font-bold ${
           size >= 72 ? "text-xl" : "text-sm"
-        } ${colorClass.split(" ")[1]}`}
+        } ${textClass}`}
       >
         {clamped}
       </span>

@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { AnalyzeForm } from "@/components/AnalyzeForm";
 import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectDetailPanel } from "@/components/ProjectDetailPanel";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const VERDICT_TABS = [
   { id: "ALL", label: "Todos" },
@@ -186,20 +187,22 @@ export default function DashboardPage() {
       {/* Minimal Header */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-100">
+          <h1 className="text-xl font-semibold tracking-tight text-fg">
             Airdrop Alpha
           </h1>
-          <p className="mt-0.5 text-xs text-zinc-500">
+          <p className="mt-0.5 text-xs text-fg-muted">
             Due diligence Web3 · Redes · Canais oficiais · Plano Anti-Sybil
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {health && (
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-zinc-400">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  health.telegram_configured ? "bg-emerald-400" : "bg-zinc-600"
+                  health.telegram_configured
+                    ? "bg-emerald-500 dark:bg-emerald-400"
+                    : "bg-fg-muted"
                 }`}
               />
               {health.gemini_configured ? "Gemini" : "Heurístico"}
@@ -208,7 +211,7 @@ export default function DashboardPage() {
 
           <button
             onClick={handleTestTelegram}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-600 hover:text-white"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
           >
             <Send className="h-3.5 w-3.5" />
             Telegram
@@ -217,39 +220,41 @@ export default function DashboardPage() {
           <button
             onClick={handleRunAllMonitors}
             disabled={isRunningMonitor}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-600 hover:text-white disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
           >
             <Radar
               className={`h-3.5 w-3.5 ${isRunningMonitor ? "animate-spin" : ""}`}
             />
             Roadmaps
           </button>
+
+          <ThemeToggle />
         </div>
       </header>
 
       {/* Inline KPI Strip */}
-      <section className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-border/80 py-3 text-xs text-zinc-500">
+      <section className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-border py-3 text-xs text-fg-muted">
         <span>
           Auditados{" "}
-          <strong className="ml-1 font-mono-code text-zinc-100">
+          <strong className="ml-1 font-mono-code text-fg">
             {stats?.total_projects ?? 0}
           </strong>
         </span>
         <span>
           Aprovados{" "}
-          <strong className="ml-1 font-mono-code text-emerald-400">
+          <strong className="ml-1 font-mono-code text-emerald-600 dark:text-emerald-400">
             {stats?.approved_projects ?? 0}
           </strong>
         </span>
         <span>
           Tasks{" "}
-          <strong className="ml-1 font-mono-code text-zinc-100">
+          <strong className="ml-1 font-mono-code text-fg">
             {stats?.completed_tasks ?? 0}/{stats?.total_tasks ?? 0}
           </strong>
         </span>
         <span>
           Updates{" "}
-          <strong className="ml-1 font-mono-code text-zinc-100">
+          <strong className="ml-1 font-mono-code text-fg">
             {stats?.roadmap_alerts ?? 0}
           </strong>
         </span>
@@ -260,16 +265,16 @@ export default function DashboardPage() {
         <div
           className={`mt-4 flex items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5 text-xs ${
             banner.type === "error"
-              ? "border-rose-500/30 bg-rose-500/10 text-rose-300"
+              ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
               : banner.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-              : "border-border bg-surface text-zinc-300"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : "border-border bg-surface text-fg-secondary"
           }`}
         >
           <span>{banner.text}</span>
           <button
             onClick={() => setBanner(null)}
-            className="text-zinc-500 hover:text-zinc-200"
+            className="text-fg-muted hover:text-fg"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -290,8 +295,8 @@ export default function DashboardPage() {
               onClick={() => setVerdictFilter(tab.id)}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                 verdictFilter === tab.id
-                  ? "bg-zinc-800 text-zinc-100"
-                  : "text-zinc-500 hover:text-zinc-300"
+                  ? "bg-elevated text-fg border border-border"
+                  : "text-fg-muted hover:text-fg"
               }`}
             >
               {tab.label}
@@ -300,13 +305,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar projeto ou rede..."
-            className="w-full rounded-lg border border-border bg-surface py-1.5 pl-8 pr-3 text-xs text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-600 focus:outline-none"
+            className="w-full rounded-lg border border-border bg-surface py-1.5 pl-8 pr-3 text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
           />
         </div>
       </section>
@@ -314,7 +319,7 @@ export default function DashboardPage() {
       {/* Grid */}
       <section className="mt-4">
         {projects.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-zinc-500">
+          <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-fg-muted">
             Nenhum projeto encontrado. Cole a URL de um protocolo acima para iniciar.
           </div>
         ) : (

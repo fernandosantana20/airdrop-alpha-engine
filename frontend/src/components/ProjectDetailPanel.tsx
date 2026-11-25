@@ -82,23 +82,23 @@ function renderLinkIcon(type: string) {
   switch (type) {
     case "website":
     case "app":
-      return <Globe className="h-3.5 w-3.5 text-zinc-400" />;
+      return <Globe className="h-3.5 w-3.5 text-fg-secondary" />;
     case "twitter":
-      return <span className="text-xs font-bold text-zinc-300 leading-none">𝕏</span>;
+      return <span className="text-xs font-bold text-fg leading-none">𝕏</span>;
     case "telegram":
-      return <Send className="h-3.5 w-3.5 text-zinc-400" />;
+      return <Send className="h-3.5 w-3.5 text-fg-secondary" />;
     case "instagram":
-      return <Instagram className="h-3.5 w-3.5 text-zinc-400" />;
+      return <Instagram className="h-3.5 w-3.5 text-fg-secondary" />;
     case "discord":
-      return <MessageSquare className="h-3.5 w-3.5 text-zinc-400" />;
+      return <MessageSquare className="h-3.5 w-3.5 text-fg-secondary" />;
     case "github":
-      return <GitBranch className="h-3.5 w-3.5 text-zinc-400" />;
+      return <GitBranch className="h-3.5 w-3.5 text-fg-secondary" />;
     case "docs":
-      return <BookOpen className="h-3.5 w-3.5 text-zinc-400" />;
+      return <BookOpen className="h-3.5 w-3.5 text-fg-secondary" />;
     case "audit":
-      return <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />;
+      return <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />;
     default:
-      return <Link2 className="h-3.5 w-3.5 text-zinc-400" />;
+      return <Link2 className="h-3.5 w-3.5 text-fg-secondary" />;
   }
 }
 
@@ -118,7 +118,6 @@ export function ProjectDetailPanel({
   const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Build fallback ecosystem_links for older rows created before migration
   const attachedLinks: EcosystemLink[] =
     project.ecosystem_links && project.ecosystem_links.length > 0
       ? project.ecosystem_links
@@ -200,28 +199,28 @@ export function ProjectDetailPanel({
   const completedCount = project.tasks.filter((t) => t.completed).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-sm">
-      <div className="relative h-full w-full max-w-3xl overflow-y-auto border-l border-border bg-canvas px-6 py-6 md:px-8">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 dark:bg-black/75 backdrop-blur-sm">
+      <div className="relative h-full w-full max-w-3xl overflow-y-auto border-l border-border bg-canvas px-6 py-6 shadow-2xl md:px-8">
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
           <div className="flex items-center gap-4">
             <ScoreRing score={project.fundamental_score} size={64} strokeWidth={5} />
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-semibold text-zinc-100">{project.name}</h2>
+                <h2 className="text-xl font-semibold text-fg">{project.name}</h2>
                 <span
                   className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
                     project.verdict === "APPROVED"
-                      ? "bg-emerald-500/15 text-emerald-400"
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
                       : project.verdict === "WATCHLIST"
-                      ? "bg-amber-500/15 text-amber-400"
-                      : "bg-rose-500/15 text-rose-400"
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                      : "bg-rose-500/15 text-rose-700 dark:text-rose-400"
                   }`}
                 >
                   {project.verdict}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="mt-1 text-xs text-fg-muted">
                 {project.category || "Web3"} ·{" "}
                 {project.analysis_mode === "gemini" ? "Gemini AI" : "Heurístico"} ·
                 Atualizado em {formatRelativeDate(project.updated_at)}
@@ -233,10 +232,10 @@ export function ProjectDetailPanel({
             <button
               onClick={handleCopyDossier}
               title="Copiar dossiê completo em Markdown"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-600 hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
             >
               {copied ? (
-                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
@@ -246,7 +245,7 @@ export function ProjectDetailPanel({
               onClick={handleReanalyze}
               disabled={reanalyzing}
               title="Reanalisar projeto agora"
-              className="rounded-lg border border-border bg-surface p-1.5 text-zinc-400 transition hover:border-zinc-600 hover:text-white disabled:opacity-50"
+              className="rounded-lg border border-border bg-surface p-1.5 text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
             >
               <RefreshCw
                 className={`h-4 w-4 ${reanalyzing ? "animate-spin" : ""}`}
@@ -256,7 +255,7 @@ export function ProjectDetailPanel({
               onClick={handleDelete}
               disabled={deleting}
               title="Remover projeto"
-              className="rounded-lg border border-border bg-surface p-1.5 text-zinc-400 transition hover:border-rose-500/40 hover:text-rose-400 disabled:opacity-50"
+              className="rounded-lg border border-border bg-surface p-1.5 text-fg-secondary transition hover:border-rose-500/40 hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-50"
             >
               {deleting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -266,7 +265,7 @@ export function ProjectDetailPanel({
             </button>
             <button
               onClick={onClose}
-              className="rounded-lg border border-border bg-surface p-1.5 text-zinc-400 transition hover:border-zinc-600 hover:text-white"
+              className="rounded-lg border border-border bg-surface p-1.5 text-fg-secondary transition hover:border-border-strong hover:text-fg"
             >
               <X className="h-4 w-4" />
             </button>
@@ -275,20 +274,22 @@ export function ProjectDetailPanel({
 
         {/* Summary & Key Telemetry */}
         <section className="mt-6">
-          <p className="text-sm leading-relaxed text-zinc-300">
+          <p className="text-sm leading-relaxed text-fg-secondary">
             {project.executive_summary}
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-lg border border-border bg-surface p-3">
-              <p className="text-[11px] text-zinc-500">TVL On-Chain</p>
-              <p className="mt-1 font-mono-code text-sm font-semibold text-zinc-100">
+              <p className="text-[11px] text-fg-muted">TVL On-Chain</p>
+              <p className="mt-1 font-mono-code text-sm font-semibold text-fg">
                 {formatUsd(project.tvl_usd)}
               </p>
               {project.tvl_change_7d !== null && (
                 <p
                   className={`text-[11px] font-mono-code ${
-                    project.tvl_change_7d >= 0 ? "text-emerald-400" : "text-rose-400"
+                    project.tvl_change_7d >= 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-rose-600 dark:text-rose-400"
                   }`}
                 >
                   {project.tvl_change_7d >= 0 ? "+" : ""}
@@ -298,11 +299,11 @@ export function ProjectDetailPanel({
             </div>
 
             <div className="rounded-lg border border-border bg-surface p-3">
-              <p className="text-[11px] text-zinc-500">Funding / Backers</p>
-              <p className="mt-1 font-mono-code text-sm font-semibold text-zinc-100">
+              <p className="text-[11px] text-fg-muted">Funding / Backers</p>
+              <p className="mt-1 font-mono-code text-sm font-semibold text-fg">
                 {formatUsd(project.funding_usd)}
               </p>
-              <p className="truncate text-[11px] text-zinc-500">
+              <p className="truncate text-[11px] text-fg-muted">
                 {project.investors.length > 0
                   ? project.investors.slice(0, 2).join(", ")
                   : "Não divulgado"}
@@ -310,11 +311,11 @@ export function ProjectDetailPanel({
             </div>
 
             <div className="rounded-lg border border-border bg-surface p-3">
-              <p className="text-[11px] text-zinc-500">GitHub</p>
-              <p className="mt-1 font-mono-code text-sm font-semibold text-zinc-100">
+              <p className="text-[11px] text-fg-muted">GitHub</p>
+              <p className="mt-1 font-mono-code text-sm font-semibold text-fg">
                 {project.github_stars !== null ? `${project.github_stars} ★` : "N/A"}
               </p>
-              <p className="text-[11px] text-zinc-500">
+              <p className="text-[11px] text-fg-muted">
                 {project.github_repos_count !== null
                   ? `${project.github_repos_count} repo(s)`
                   : "Não indexado"}
@@ -322,11 +323,11 @@ export function ProjectDetailPanel({
             </div>
 
             <div className="rounded-lg border border-border bg-surface p-3">
-              <p className="text-[11px] text-zinc-500">Redes Ativas</p>
-              <p className="mt-1 font-mono-code text-sm font-semibold text-zinc-100">
+              <p className="text-[11px] text-fg-muted">Redes Ativas</p>
+              <p className="mt-1 font-mono-code text-sm font-semibold text-fg">
                 {project.chains.length || "—"}
               </p>
-              <p className="truncate text-[11px] text-zinc-500">
+              <p className="truncate text-[11px] text-fg-muted">
                 {project.chains[0] || "Não detectada"}
               </p>
             </div>
@@ -334,11 +335,11 @@ export function ProjectDetailPanel({
 
           {project.investors.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-zinc-500 mr-1">Investidores:</span>
+              <span className="text-[11px] text-fg-muted mr-1">Investidores:</span>
               {project.investors.slice(0, 10).map((inv) => (
                 <span
                   key={inv}
-                  className="rounded bg-surface border border-border px-2 py-0.5 text-[11px] text-zinc-300"
+                  className="rounded border border-border bg-surface px-2 py-0.5 text-[11px] text-fg-secondary"
                 >
                   {inv}
                 </span>
@@ -350,17 +351,35 @@ export function ProjectDetailPanel({
         {/* Anexo — Canais & Links Vinculados */}
         <section className="mt-7 border-t border-border pt-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
               Anexo · Canais &amp; Links Vinculados ({attachedLinks.length})
             </h3>
-            <div className="flex items-center gap-3 text-[11px] text-zinc-500">
-              <span className={project.twitter_url ? "text-emerald-400" : ""}>
+            <div className="flex items-center gap-3 text-[11px] text-fg-muted">
+              <span
+                className={
+                  project.twitter_url
+                    ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                    : ""
+                }
+              >
                 X {project.twitter_url ? "✓" : "—"}
               </span>
-              <span className={project.telegram_url ? "text-emerald-400" : ""}>
+              <span
+                className={
+                  project.telegram_url
+                    ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                    : ""
+                }
+              >
                 Telegram {project.telegram_url ? "✓" : "—"}
               </span>
-              <span className={project.instagram_url ? "text-emerald-400" : ""}>
+              <span
+                className={
+                  project.instagram_url
+                    ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                    : ""
+                }
+              >
                 Instagram {project.instagram_url ? "✓" : "—"}
               </span>
             </div>
@@ -373,20 +392,20 @@ export function ProjectDetailPanel({
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs transition hover:border-zinc-600 hover:bg-elevated"
+                className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs transition hover:border-border-strong hover:bg-elevated"
               >
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-canvas border border-border/80">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-canvas">
                     {renderLinkIcon(item.type)}
                   </span>
                   <div className="min-w-0">
-                    <p className="font-medium text-zinc-200">{item.label}</p>
-                    <p className="truncate font-mono-code text-[11px] text-zinc-500">
+                    <p className="font-medium text-fg">{item.label}</p>
+                    <p className="truncate font-mono-code text-[11px] text-fg-muted">
                       {item.url.replace(/^https?:\/\/(www\.)?/, "")}
                     </p>
                   </div>
                 </div>
-                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
               </a>
             ))}
           </div>
@@ -394,13 +413,13 @@ export function ProjectDetailPanel({
 
         {/* Redes & Distribuição de TVL */}
         <section className="mt-7 border-t border-border pt-6">
-          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
             <Layers className="h-3.5 w-3.5" />
             Redes em Operação
           </h3>
 
           {project.chains.length === 0 ? (
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className="mt-2 text-xs text-fg-muted">
               Nenhuma rede blockchain específica detectada automaticamente até o momento.
             </p>
           ) : (
@@ -409,7 +428,7 @@ export function ProjectDetailPanel({
                 {project.chains.map((chain) => (
                   <span
                     key={chain}
-                    className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-zinc-200"
+                    className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg"
                   >
                     {chain}
                   </span>
@@ -418,7 +437,7 @@ export function ProjectDetailPanel({
 
               {chainTvlEntries.length > 0 && (
                 <div className="mt-3 space-y-2 rounded-lg border border-border bg-surface p-3.5">
-                  <p className="text-[11px] text-zinc-500">
+                  <p className="text-[11px] text-fg-muted">
                     Distribuição de TVL por rede (DefiLlama)
                   </p>
                   {chainTvlEntries.slice(0, 6).map(([chainName, tvlVal]) => {
@@ -429,14 +448,14 @@ export function ProjectDetailPanel({
                     return (
                       <div key={chainName}>
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-zinc-200">{chainName}</span>
-                          <span className="font-mono-code text-zinc-400">
+                          <span className="text-fg">{chainName}</span>
+                          <span className="font-mono-code text-fg-secondary">
                             {formatUsd(tvlVal)} ({share}%)
                           </span>
                         </div>
-                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-zinc-800">
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-track">
                           <div
-                            className="h-full rounded-full bg-emerald-500/80"
+                            className="h-full rounded-full bg-emerald-600 dark:bg-emerald-400"
                             style={{ width: `${share}%` }}
                           />
                         </div>
@@ -451,7 +470,7 @@ export function ProjectDetailPanel({
 
         {/* Score Breakdown */}
         <section className="mt-7 border-t border-border pt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
             Auditoria Fundamentalista (6 Pilares)
           </h3>
           <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
@@ -460,22 +479,22 @@ export function ProjectDetailPanel({
               const pct = Math.min(100, Math.round((val / max) * 100));
               const barColor =
                 pct >= 70
-                  ? "bg-emerald-400"
+                  ? "bg-emerald-600 dark:bg-emerald-400"
                   : pct >= 45
-                  ? "bg-amber-400"
-                  : "bg-rose-400";
+                  ? "bg-amber-500 dark:bg-amber-400"
+                  : "bg-rose-500 dark:bg-rose-400";
               return (
                 <div
                   key={key}
                   className="rounded-lg border border-border bg-surface p-3"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-300">{label}</span>
-                    <span className="font-mono-code text-zinc-100">
+                    <span className="text-fg-secondary">{label}</span>
+                    <span className="font-mono-code font-medium text-fg">
                       {val}/{max}
                     </span>
                   </div>
-                  <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-zinc-800">
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-track">
                     <div
                       className={`h-full rounded-full ${barColor}`}
                       style={{ width: `${pct}%` }}
@@ -489,10 +508,10 @@ export function ProjectDetailPanel({
           {/* Bull case & Red flags */}
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             <div className="rounded-lg border border-border bg-surface p-4">
-              <h4 className="text-xs font-semibold text-emerald-400">
+              <h4 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                 Pontos Fortes
               </h4>
-              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-zinc-300">
+              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-fg-secondary">
                 {project.bull_case.map((item, idx) => (
                   <li key={idx}>• {item}</li>
                 ))}
@@ -500,14 +519,14 @@ export function ProjectDetailPanel({
             </div>
 
             <div className="rounded-lg border border-border bg-surface p-4">
-              <h4 className="text-xs font-semibold text-rose-400">
+              <h4 className="text-xs font-semibold text-rose-600 dark:text-rose-400">
                 Riscos &amp; Red Flags
               </h4>
-              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-zinc-300">
+              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-fg-secondary">
                 {project.red_flags.length > 0 ? (
                   project.red_flags.map((item, idx) => <li key={idx}>• {item}</li>)
                 ) : (
-                  <li className="text-zinc-500">Nenhum red flag crítico.</li>
+                  <li className="text-fg-muted">Nenhum red flag crítico.</li>
                 )}
               </ul>
             </div>
@@ -517,19 +536,19 @@ export function ProjectDetailPanel({
         {/* Anti-Sybil Strategic Plan */}
         <section className="mt-7 border-t border-border pt-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
               Plano Estratégico Anti-Sybil
             </h3>
             {project.tasks.length > 0 && (
-              <span className="font-mono-code text-xs text-zinc-400">
+              <span className="font-mono-code text-xs text-fg-secondary">
                 {completedCount}/{project.tasks.length} concluídas
               </span>
             )}
           </div>
-          <p className="mt-2 text-xs text-zinc-400">{project.anti_sybil_strategy}</p>
+          <p className="mt-2 text-xs text-fg-secondary">{project.anti_sybil_strategy}</p>
 
           {project.tasks.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-border bg-surface p-3.5 text-xs text-zinc-400">
+            <p className="mt-3 rounded-lg border border-border bg-surface p-3.5 text-xs text-fg-muted">
               Score abaixo de 70 pontos — plano de farming não recomendado.
             </p>
           ) : (
@@ -539,7 +558,7 @@ export function ProjectDetailPanel({
                   key={task.id}
                   className={`rounded-lg border p-3.5 transition ${
                     task.completed
-                      ? "border-border/60 bg-surface/50 opacity-60"
+                      ? "border-border/60 bg-surface/60 opacity-65"
                       : "border-border bg-surface"
                   }`}
                 >
@@ -547,14 +566,14 @@ export function ProjectDetailPanel({
                     <button
                       onClick={() => handleTaskClick(task.id, task.completed)}
                       disabled={togglingTaskId === task.id}
-                      className="mt-0.5 text-emerald-400 shrink-0"
+                      className="mt-0.5 text-emerald-600 dark:text-emerald-400 shrink-0"
                     >
                       {togglingTaskId === task.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : task.completed ? (
                         <CheckCircle2 className="h-4 w-4" />
                       ) : (
-                        <Circle className="h-4 w-4 text-zinc-600 hover:text-zinc-400" />
+                        <Circle className="h-4 w-4 text-fg-muted hover:text-fg" />
                       )}
                     </button>
 
@@ -563,22 +582,22 @@ export function ProjectDetailPanel({
                         <h4
                           className={`text-xs font-semibold ${
                             task.completed
-                              ? "line-through text-zinc-500"
-                              : "text-zinc-100"
+                              ? "line-through text-fg-muted"
+                              : "text-fg"
                           }`}
                         >
                           {task.title}
                         </h4>
-                        <span className="font-mono-code text-[10px] text-zinc-500">
+                        <span className="font-mono-code text-[10px] text-fg-muted">
                           {task.priority} · {task.frequency} · {task.estimated_cost_usd}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                      <p className="mt-1 text-xs leading-relaxed text-fg-secondary">
                         {task.description}
                       </p>
                       {task.anti_sybil_tip && (
-                        <p className="mt-1.5 text-[11px] text-zinc-500">
-                          <span className="text-zinc-300 font-medium">Dica Anti-Sybil:</span>{" "}
+                        <p className="mt-1.5 text-[11px] text-fg-muted">
+                          <span className="font-medium text-fg">Dica Anti-Sybil:</span>{" "}
                           {task.anti_sybil_tip}
                         </p>
                       )}
@@ -594,10 +613,10 @@ export function ProjectDetailPanel({
         <section className="mt-7 border-t border-border pt-6 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
                 Monitor de Roadmap &amp; Docs
               </h3>
-              <p className="mt-1 font-mono-code text-[11px] text-zinc-500">
+              <p className="mt-1 font-mono-code text-[11px] text-fg-muted">
                 {project.monitored_url || project.url}
               </p>
             </div>
@@ -605,16 +624,16 @@ export function ProjectDetailPanel({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => onToggleMonitor(!project.monitoring_enabled)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-600"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
               >
                 {project.monitoring_enabled ? (
                   <>
-                    <Bell className="h-3.5 w-3.5 text-emerald-400" />
+                    <Bell className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                     Ativo
                   </>
                 ) : (
                   <>
-                    <BellOff className="h-3.5 w-3.5 text-zinc-500" />
+                    <BellOff className="h-3.5 w-3.5 text-fg-muted" />
                     Pausado
                   </>
                 )}
@@ -623,7 +642,7 @@ export function ProjectDetailPanel({
               <button
                 onClick={handleCheckNow}
                 disabled={checkingUpdate}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-zinc-300 hover:border-zinc-600 disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
               >
                 {checkingUpdate ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -636,7 +655,9 @@ export function ProjectDetailPanel({
           </div>
 
           {lastCheckMsg && (
-            <p className="mt-2.5 text-xs text-emerald-400">{lastCheckMsg}</p>
+            <p className="mt-2.5 text-xs text-emerald-600 dark:text-emerald-400">
+              {lastCheckMsg}
+            </p>
           )}
 
           {project.roadmap_snapshots.length > 0 && (
@@ -646,11 +667,11 @@ export function ProjectDetailPanel({
                   key={snap.id}
                   className="rounded-lg border border-border bg-surface p-3 text-xs"
                 >
-                  <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                  <div className="flex items-center justify-between text-[11px] text-fg-muted">
                     <span>{formatRelativeDate(snap.detected_at)}</span>
                     <span>{snap.alert_sent ? "Telegram ✓" : "Local"}</span>
                   </div>
-                  <p className="mt-1.5 whitespace-pre-line text-zinc-300">
+                  <p className="mt-1.5 whitespace-pre-line text-fg-secondary">
                     {snap.diff_summary}
                   </p>
                 </div>
