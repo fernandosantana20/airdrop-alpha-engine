@@ -30,8 +30,15 @@ class Settings(BaseSettings):
 
     @property
     def effective_database_url(self) -> str:
-        if self.database_url:
-            return self.database_url
+        raw = (
+            self.database_url
+            or os.environ.get("POSTGRES_URL", "")
+            or os.environ.get("POSTGRES_PRISMA_URL", "")
+        )
+        if raw:
+            if raw.startswith("postgres://"):
+                raw = "postgresql://" + raw[len("postgres://") :]
+            return raw
         if self.is_vercel:
             return "sqlite:////tmp/airdrop_alpha.db"
         return "sqlite:///./airdrop_alpha.db"
