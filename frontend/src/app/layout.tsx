@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,6 +12,13 @@ export const metadata: Metadata = {
   title: "Airdrop Alpha & Due Diligence Engine",
   description:
     "Auditoria fundamentalista Web3, plano estratégico Anti-Sybil e monitoramento automatizado de roadmaps.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 };
 
 const THEME_INIT_SCRIPT = `
@@ -39,7 +46,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body
-        className={`${inter.variable} ${jetbrains.variable} font-sans bg-canvas text-fg antialiased selection:bg-emerald-500/20 selection:text-emerald-700 dark:selection:text-emerald-200`}
+        className={`${inter.variable} ${jetbrains.variable} font-sans bg-canvas text-fg antialiased overflow-x-hidden selection:bg-emerald-500/20 selection:text-emerald-700 dark:selection:text-emerald-200`}
       >
         {children}
       </body>

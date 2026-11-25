@@ -200,159 +200,175 @@ export default function DashboardPage() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      {/* Minimal Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-fg">
-            Airdrop Alpha
-          </h1>
-          <p className="mt-0.5 text-xs text-fg-muted">
-            Due diligence Web3 · Redes · Canais oficiais · Plano Anti-Sybil
-          </p>
-        </div>
+    <div className="min-h-[100dvh] pb-12">
+      {/* Floating Top Navbar */}
+      <div className="sticky top-0 z-40 px-3 pt-2 sm:px-6 sm:pt-3">
+        <header className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-2xl border border-border bg-surface/90 px-3.5 py-2.5 shadow-sm backdrop-blur-md sm:px-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              className={`h-2 w-2 rounded-full shrink-0 ${
+                health?.telegram_configured
+                  ? "bg-emerald-500 dark:bg-emerald-400"
+                  : "bg-fg-muted"
+              }`}
+              title={
+                health?.telegram_configured
+                  ? "Telegram conectado"
+                  : "Telegram desconectado"
+              }
+            />
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-semibold tracking-tight text-fg sm:text-base">
+                Airdrop Alpha
+              </h1>
+              <p className="hidden text-[11px] text-fg-muted md:block">
+                Due diligence Web3 · Redes · Canais · Roadmap · Anti-Sybil
+              </p>
+            </div>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {health && (
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary">
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  health.telegram_configured
-                    ? "bg-emerald-500 dark:bg-emerald-400"
-                    : "bg-fg-muted"
+          <div className="flex items-center gap-1.5 shrink-0">
+            {health && (
+              <span className="hidden md:inline-flex h-8 items-center rounded-lg border border-border bg-canvas/80 px-2.5 text-xs text-fg-secondary">
+                {health.gemini_configured ? "Gemini" : "Heurístico"}
+              </span>
+            )}
+
+            <button
+              onClick={handleTestTelegram}
+              title="Testar alerta no Telegram"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas/80 px-2.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
+            >
+              <Send className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden sm:inline">Telegram</span>
+            </button>
+
+            <button
+              onClick={handleRunAllMonitors}
+              disabled={isRunningMonitor}
+              title="Verificar atualizações de roadmaps"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas/80 px-2.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
+            >
+              <Radar
+                className={`h-3.5 w-3.5 shrink-0 ${
+                  isRunningMonitor ? "animate-spin" : ""
                 }`}
               />
-              {health.gemini_configured ? "Gemini" : "Heurístico"}
-            </span>
-          )}
-
-          <button
-            onClick={handleTestTelegram}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
-          >
-            <Send className="h-3.5 w-3.5" />
-            Telegram
-          </button>
-
-          <button
-            onClick={handleRunAllMonitors}
-            disabled={isRunningMonitor}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
-          >
-            <Radar
-              className={`h-3.5 w-3.5 ${isRunningMonitor ? "animate-spin" : ""}`}
-            />
-            Roadmaps
-          </button>
-
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {/* Inline KPI Strip */}
-      <section className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-border py-3 text-xs text-fg-muted">
-        <span>
-          Auditados{" "}
-          <strong className="ml-1 font-mono-code text-fg">
-            {stats?.total_projects ?? 0}
-          </strong>
-        </span>
-        <span>
-          Aprovados{" "}
-          <strong className="ml-1 font-mono-code text-emerald-600 dark:text-emerald-400">
-            {stats?.approved_projects ?? 0}
-          </strong>
-        </span>
-        <span>
-          Tasks{" "}
-          <strong className="ml-1 font-mono-code text-fg">
-            {stats?.completed_tasks ?? 0}/{stats?.total_tasks ?? 0}
-          </strong>
-        </span>
-        <span>
-          Updates{" "}
-          <strong className="ml-1 font-mono-code text-fg">
-            {stats?.roadmap_alerts ?? 0}
-          </strong>
-        </span>
-      </section>
-
-      {/* Banner */}
-      {banner && (
-        <div
-          className={`mt-4 flex items-center justify-between gap-3 rounded-lg border px-3.5 py-2.5 text-xs ${
-            banner.type === "error"
-              ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
-              : banner.type === "success"
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-              : "border-border bg-surface text-fg-secondary"
-          }`}
-        >
-          <span>{banner.text}</span>
-          <button
-            onClick={() => setBanner(null)}
-            className="text-fg-muted hover:text-fg"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      {/* Analyze Input */}
-      <section className="mt-5">
-        <AnalyzeForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
-      </section>
-
-      {/* Filter & Search */}
-      <section className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-1">
-          {VERDICT_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setVerdictFilter(tab.id)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                verdictFilter === tab.id
-                  ? "bg-elevated text-fg border border-border"
-                  : "text-fg-muted hover:text-fg"
-              }`}
-            >
-              {tab.label}
+              <span className="hidden sm:inline">Roadmaps</span>
             </button>
-          ))}
-        </div>
 
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar projeto ou rede..."
-            className="w-full rounded-lg border border-border bg-surface py-1.5 pl-8 pr-3 text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
-          />
-        </div>
-      </section>
-
-      {/* Grid */}
-      <section className="mt-4">
-        {projects.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-fg-muted">
-            Nenhum projeto encontrado. Cole a URL de um protocolo acima para iniciar.
+            <ThemeToggle />
           </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {projects.map((proj) => (
-              <ProjectCard
-                key={proj.id}
-                project={proj}
-                onSelect={handleSelectProject}
-              />
-            ))}
+        </header>
+      </div>
+
+      {/* Main Content */}
+      <main className="mx-auto max-w-6xl px-3 pt-5 sm:px-6 sm:pt-6">
+        {/* Inline KPI Strip */}
+        <section className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border pb-3 text-xs text-fg-muted">
+          <span>
+            Auditados{" "}
+            <strong className="ml-1 font-mono-code text-fg">
+              {stats?.total_projects ?? 0}
+            </strong>
+          </span>
+          <span>
+            Aprovados{" "}
+            <strong className="ml-1 font-mono-code text-emerald-600 dark:text-emerald-400">
+              {stats?.approved_projects ?? 0}
+            </strong>
+          </span>
+          <span>
+            Tasks{" "}
+            <strong className="ml-1 font-mono-code text-fg">
+              {stats?.completed_tasks ?? 0}/{stats?.total_tasks ?? 0}
+            </strong>
+          </span>
+          <span>
+            Updates{" "}
+            <strong className="ml-1 font-mono-code text-fg">
+              {stats?.roadmap_alerts ?? 0}
+            </strong>
+          </span>
+        </section>
+
+        {/* Banner */}
+        {banner && (
+          <div
+            className={`mt-4 flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-xs ${
+              banner.type === "error"
+                ? "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                : banner.type === "success"
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "border-border bg-surface text-fg-secondary"
+            }`}
+          >
+            <span>{banner.text}</span>
+            <button
+              onClick={() => setBanner(null)}
+              className="text-fg-muted hover:text-fg shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
-      </section>
 
-      {/* Detail Drawer */}
+        {/* Analyze Input */}
+        <section className="mt-4">
+          <AnalyzeForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
+        </section>
+
+        {/* Filter Tabs (Horizontally Scrollable on Mobile) & Search */}
+        <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+            {VERDICT_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setVerdictFilter(tab.id)}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                  verdictFilter === tab.id
+                    ? "border border-border bg-elevated text-fg"
+                    : "text-fg-muted hover:text-fg"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar projeto ou rede..."
+              className="w-full rounded-lg border border-border bg-surface py-2 pl-8 pr-3 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+            />
+          </div>
+        </section>
+
+        {/* Responsive Grid */}
+        <section className="mt-4">
+          {projects.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-fg-muted">
+              Nenhum projeto encontrado. Cole a URL de um protocolo acima para iniciar.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {projects.map((proj) => (
+                <ProjectCard
+                  key={proj.id}
+                  project={proj}
+                  onSelect={handleSelectProject}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+
+      {/* Full-Screen Project Detail View */}
       {selectedProject && (
         <ProjectDetailPanel
           project={selectedProject}
@@ -365,6 +381,6 @@ export default function DashboardPage() {
           onDelete={handleDeleteProject}
         />
       )}
-    </main>
+    </div>
   );
 }

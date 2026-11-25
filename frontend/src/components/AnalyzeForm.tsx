@@ -52,9 +52,9 @@ export function AnalyzeForm({ onAnalyze, isLoading }: AnalyzeFormProps) {
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Cole a URL do projeto (ex: https://tori.finance ou https://berachain.com)"
+            placeholder="Cole a URL do projeto (ex: https://tori.finance)"
             disabled={isLoading}
-            className="w-full rounded-lg border border-border bg-canvas py-2.5 pl-9 pr-3 text-sm text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none disabled:opacity-60"
+            className="w-full rounded-lg border border-border bg-canvas py-2.5 pl-9 pr-3 text-base sm:text-sm text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none disabled:opacity-60"
             required
           />
         </div>
@@ -62,7 +62,7 @@ export function AnalyzeForm({ onAnalyze, isLoading }: AnalyzeFormProps) {
         <button
           type="submit"
           disabled={isLoading || !url.trim()}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-btn px-4 py-2.5 text-sm font-medium text-btn-fg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg bg-btn px-4 py-2.5 text-sm font-medium text-btn-fg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {isLoading ? (
             <>

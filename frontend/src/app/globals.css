@@ -36,11 +36,22 @@
   body {
     background-color: rgb(var(--bg-canvas));
     color: rgb(var(--text-primary));
-    min-height: 100vh;
+    min-height: 100dvh;
+    padding-bottom: env(safe-area-inset-bottom);
     transition: background-color 150ms ease, color 150ms ease;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
 .font-mono-code {
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

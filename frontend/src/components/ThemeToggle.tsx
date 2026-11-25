@@ -34,17 +34,17 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
       aria-label={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
-      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
+      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas/80 px-2.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
     >
       {theme === "dark" ? (
         <>
-          <Sun className="h-3.5 w-3.5 text-amber-400" />
-          <span>Tema Claro</span>
+          <Sun className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+          <span className="hidden sm:inline">Claro</span>
         </>
       ) : (
         <>
-          <Moon className="h-3.5 w-3.5 text-fg-secondary" />
-          <span>Tema Escuro</span>
+          <Moon className="h-3.5 w-3.5 text-fg-secondary shrink-0" />
+          <span className="hidden sm:inline">Escuro</span>
         </>
       )}
     </button>

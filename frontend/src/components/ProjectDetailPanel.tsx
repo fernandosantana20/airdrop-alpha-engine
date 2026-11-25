@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ArrowLeft,
   Bell,
   BellOff,
   BookOpen,
@@ -21,11 +22,11 @@ import {
   Send,
   ShieldCheck,
   Trash2,
-  X,
 } from "lucide-react";
 import type { EcosystemLink, MonitorCheckResult, ProjectDetail } from "@/types/airdrop";
 import { formatRelativeDate, formatUsd } from "@/lib/api";
 import { ScoreRing } from "./ScoreRing";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface ProjectDetailPanelProps {
   project: ProjectDetail;
@@ -56,6 +57,9 @@ function buildDossierMarkdown(project: ProjectDetail, links: EcosystemLink[]): s
     ([c, v]) => `- ${c}: ${formatUsd(v)}`
   );
   const linkLines = links.map((l) => `- ${l.label}: ${l.url}`);
+  const milestoneLines = (project.roadmap_milestones || []).map(
+    (m) => `- **${m.phase} · ${m.title}** (${m.status})${m.details ? ` — ${m.details}` : ""}`
+  );
   const taskLines = project.tasks.map(
     (t) => `- [${t.completed ? "x" : " "}] **${t.title}** (${t.priority} | ${t.frequency}) — ${t.description}`
   );
@@ -65,6 +69,7 @@ function buildDossierMarkdown(project: ProjectDetail, links: EcosystemLink[]): s
     ``,
     `**Setor:** ${project.category || "Web3"} | **Redes:** ${chainsStr}`,
     `**TVL:** ${formatUsd(project.tvl_usd)} | **Funding:** ${formatUsd(project.funding_usd)} | **Backers:** ${project.investors.join(", ") || "N/A"}`,
+    ...(project.user_referral_link ? [`**Meu Referral:** ${project.user_referral_link}`] : []),
     ``,
     `## Resumo Executivo`,
     project.executive_summary,
@@ -72,6 +77,7 @@ function buildDossierMarkdown(project: ProjectDetail, links: EcosystemLink[]): s
     `## Anexo — Canais & Links Vinculados`,
     ...(linkLines.length > 0 ? linkLines : [`- Site: ${project.url}`]),
     ...(chainTvlLines.length > 0 ? ["", "## TVL por Rede", ...chainTvlLines] : []),
+    ...(milestoneLines.length > 0 ? ["", "## Roadmap", ...milestoneLines] : []),
     ``,
     `## Pontos Fortes (Bull Case)`,
     ...project.bull_case.map((b) => `- ${b}`),
@@ -127,26 +133,24 @@ export function ProjectDetailPanel({
   const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const handleSaveRef = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSavingRef(true);
-    try {
-      await onSaveReferral({
-        user_referral_link: refInput,
-        waitlist_url: waitlistInput,
-      });
-    } finally {
-      setSavingRef(false);
-    }
-  };
+  // Sync inputs when project updates & lock background scroll
+  useEffect(() => {
+    setRefInput(project.user_referral_link || "");
+    setWaitlistInput(project.waitlist_url || "");
+  }, [project.id, project.user_referral_link, project.waitlist_url]);
 
-  const handleCopyRef = async () => {
-    const target = project.user_referral_link || refInput;
-    if (!target) return;
-    await navigator.clipboard.writeText(target);
-    setCopiedRef(true);
-    setTimeout(() => setCopiedRef(false), 2000);
-  };
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
 
   const attachedLinks: EcosystemLink[] =
     project.ecosystem_links && project.ecosystem_links.length > 0
@@ -175,6 +179,27 @@ export function ProjectDetailPanel({
 
   const chainTvlEntries = Object.entries(project.chain_tvls || {});
   const totalChainTvl = chainTvlEntries.reduce((acc, [, v]) => acc + v, 0);
+
+  const handleSaveRef = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingRef(true);
+    try {
+      await onSaveReferral({
+        user_referral_link: refInput,
+        waitlist_url: waitlistInput,
+      });
+    } finally {
+      setSavingRef(false);
+    }
+  };
+
+  const handleCopyRef = async () => {
+    const target = project.user_referral_link || refInput;
+    if (!target) return;
+    await navigator.clipboard.writeText(target);
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 2000);
+  };
 
   const handleCopyDossier = async () => {
     await navigator.clipboard.writeText(buildDossierMarkdown(project, attachedLinks));
@@ -229,17 +254,26 @@ export function ProjectDetailPanel({
   const completedCount = project.tasks.filter((t) => t.completed).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50 dark:bg-black/75 backdrop-blur-sm">
-      <div className="relative h-full w-full max-w-3xl overflow-y-auto border-l border-border bg-canvas px-6 py-6 shadow-2xl md:px-8">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 border-b border-border pb-5">
-          <div className="flex items-center gap-4">
-            <ScoreRing score={project.fundamental_score} size={64} strokeWidth={5} />
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-semibold text-fg">{project.name}</h2>
+    <div className="fixed inset-0 z-50 h-[100dvh] w-full overflow-y-auto bg-canvas">
+      {/* Floating Sticky Top Bar */}
+      <div className="sticky top-0 z-30 px-3 pt-2 sm:px-6 sm:pt-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-2xl border border-border bg-surface/90 px-3 py-2 shadow-sm backdrop-blur-md sm:px-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <button
+              onClick={onClose}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas/80 px-2.5 text-xs font-medium text-fg-secondary transition hover:border-border-strong hover:text-fg shrink-0"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span className="hidden xs:inline sm:inline">Voltar</span>
+            </button>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="truncate text-sm font-semibold text-fg sm:text-base">
+                  {project.name}
+                </h2>
                 <span
-                  className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                  className={`hidden sm:inline-block rounded-md px-2 py-0.5 text-[10px] font-medium shrink-0 ${
                     project.verdict === "APPROVED"
                       ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
                       : project.verdict === "WATCHLIST"
@@ -250,68 +284,104 @@ export function ProjectDetailPanel({
                   {project.verdict}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-fg-muted">
-                {project.category || "Web3"} ·{" "}
-                {project.analysis_mode === "gemini" ? "Gemini AI" : "Heurístico"} ·
-                Atualizado em {formatRelativeDate(project.updated_at)}
-              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={handleCopyDossier}
               title="Copiar dossiê completo em Markdown"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas/80 px-2.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
             >
               {copied ? (
                 <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
-              {copied ? "Copiado" : "Copiar"}
+              <span className="hidden sm:inline">{copied ? "Copiado" : "Copiar"}</span>
             </button>
+
             <button
               onClick={handleReanalyze}
               disabled={reanalyzing}
-              title="Reanalisar projeto agora"
-              className="rounded-lg border border-border bg-surface p-1.5 text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
+              title="Reanalisar projeto"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-canvas/80 text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
             >
-              <RefreshCw
-                className={`h-4 w-4 ${reanalyzing ? "animate-spin" : ""}`}
-              />
+              <RefreshCw className={`h-3.5 w-3.5 ${reanalyzing ? "animate-spin" : ""}`} />
             </button>
+
+            <ThemeToggle />
+
             <button
               onClick={handleDelete}
               disabled={deleting}
               title="Remover projeto"
-              className="rounded-lg border border-border bg-surface p-1.5 text-fg-secondary transition hover:border-rose-500/40 hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-50"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-canvas/80 text-fg-secondary transition hover:border-rose-500/40 hover:text-rose-600 dark:hover:text-rose-400 disabled:opacity-50"
             >
               {deleting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3.5 w-3.5" />
               )}
-            </button>
-            <button
-              onClick={onClose}
-              className="rounded-lg border border-border bg-surface p-1.5 text-fg-secondary transition hover:border-border-strong hover:text-fg"
-            >
-              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Summary & Key Telemetry */}
-        <section className="mt-6">
-          <p className="text-sm leading-relaxed text-fg-secondary">
+      {/* Full-Width Responsive Body */}
+      <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
+        {/* Hero Overview */}
+        <section className="rounded-2xl border border-border bg-surface p-4 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <ScoreRing score={project.fundamental_score} size={72} strokeWidth={6} />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl font-semibold text-fg sm:text-2xl">
+                    {project.name}
+                  </h1>
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
+                      project.verdict === "APPROVED"
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                        : project.verdict === "WATCHLIST"
+                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                        : "bg-rose-500/15 text-rose-700 dark:text-rose-400"
+                    }`}
+                  >
+                    {project.verdict}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-fg-muted">
+                  {project.category || "Web3"} ·{" "}
+                  {project.analysis_mode === "gemini" ? "Gemini AI" : "Heurístico"} ·
+                  Atualizado em {formatRelativeDate(project.updated_at)}
+                </p>
+              </div>
+            </div>
+
+            {project.investors.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {project.investors.slice(0, 6).map((inv) => (
+                  <span
+                    key={inv}
+                    className="rounded-md border border-border bg-canvas px-2 py-0.5 text-[11px] text-fg-secondary"
+                  >
+                    {inv}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <p className="mt-4 text-sm leading-relaxed text-fg-secondary">
             {project.executive_summary}
           </p>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-lg border border-border bg-surface p-3">
+          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-xl border border-border bg-canvas p-3">
               <p className="text-[11px] text-fg-muted">TVL On-Chain</p>
-              <p className="mt-1 font-mono-code text-sm font-semibold text-fg">
+              <p className="mt-1 font-mono-code text-base font-semibold text-fg">
                 {formatUsd(project.tvl_usd)}
               </p>
               {project.tvl_change_7d !== null && (
@@ -328,9 +398,9 @@ export function ProjectDetailPanel({
               )}
             </div>
 
-            <div className="rounded-lg border border-border bg-surface p-3">
+            <div className="rounded-xl border border-border bg-canvas p-3">
               <p className="text-[11px] text-fg-muted">Funding / Backers</p>
-              <p className="mt-1 font-mono-code text-sm font-semibold text-fg">
+              <p className="mt-1 font-mono-code text-base font-semibold text-fg">
                 {formatUsd(project.funding_usd)}
               </p>
               <p className="truncate text-[11px] text-fg-muted">
@@ -340,9 +410,9 @@ export function ProjectDetailPanel({
               </p>
             </div>
 
-            <div className="rounded-lg border border-border bg-surface p-3">
+            <div className="rounded-xl border border-border bg-canvas p-3">
               <p className="text-[11px] text-fg-muted">GitHub</p>
-              <p className="mt-1 font-mono-code text-sm font-semibold text-fg">
+              <p className="mt-1 font-mono-code text-base font-semibold text-fg">
                 {project.github_stars !== null ? `${project.github_stars} ★` : "N/A"}
               </p>
               <p className="text-[11px] text-fg-muted">
@@ -352,9 +422,9 @@ export function ProjectDetailPanel({
               </p>
             </div>
 
-            <div className="rounded-lg border border-border bg-surface p-3">
+            <div className="rounded-xl border border-border bg-canvas p-3">
               <p className="text-[11px] text-fg-muted">Redes Ativas</p>
-              <p className="mt-1 font-mono-code text-sm font-semibold text-fg">
+              <p className="mt-1 font-mono-code text-base font-semibold text-fg">
                 {project.chains.length || "—"}
               </p>
               <p className="truncate text-[11px] text-fg-muted">
@@ -362,531 +432,529 @@ export function ProjectDetailPanel({
               </p>
             </div>
           </div>
-
-          {project.investors.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-fg-muted mr-1">Investidores:</span>
-              {project.investors.slice(0, 10).map((inv) => (
-                <span
-                  key={inv}
-                  className="rounded border border-border bg-surface px-2 py-0.5 text-[11px] text-fg-secondary"
-                >
-                  {inv}
-                </span>
-              ))}
-            </div>
-          )}
         </section>
 
-        {/* Anexo — Canais & Links Vinculados */}
-        <section className="mt-7 border-t border-border pt-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
-              Anexo · Canais &amp; Links Vinculados ({attachedLinks.length})
-            </h3>
-            <div className="flex items-center gap-3 text-[11px] text-fg-muted">
-              <span
-                className={
-                  project.twitter_url
-                    ? "text-emerald-600 dark:text-emerald-400 font-medium"
-                    : ""
-                }
-              >
-                X {project.twitter_url ? "✓" : "—"}
-              </span>
-              <span
-                className={
-                  project.telegram_url
-                    ? "text-emerald-600 dark:text-emerald-400 font-medium"
-                    : ""
-                }
-              >
-                Telegram {project.telegram_url ? "✓" : "—"}
-              </span>
-              <span
-                className={
-                  project.instagram_url
-                    ? "text-emerald-600 dark:text-emerald-400 font-medium"
-                    : ""
-                }
-              >
-                Instagram {project.instagram_url ? "✓" : "—"}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {attachedLinks.map((item, idx) => (
-              <a
-                key={`${item.url}-${idx}`}
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs transition hover:border-border-strong hover:bg-elevated"
-              >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-canvas">
-                    {renderLinkIcon(item.type)}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="font-medium text-fg">{item.label}</p>
-                    <p className="truncate font-mono-code text-[11px] text-fg-muted">
-                      {item.url.replace(/^https?:\/\/(www\.)?/, "")}
-                    </p>
-                  </div>
-                </div>
-                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
-              </a>
-            ))}
-          </div>
-        </section>
-
-        {/* Redes & Distribuição de TVL */}
-        <section className="mt-7 border-t border-border pt-6">
-          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
-            <Layers className="h-3.5 w-3.5" />
-            Redes em Operação
-          </h3>
-
-          {project.chains.length === 0 ? (
-            <p className="mt-2 text-xs text-fg-muted">
-              Nenhuma rede blockchain específica detectada automaticamente até o momento.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-2.5">
-              <div className="flex flex-wrap gap-1.5">
-                {project.chains.map((chain) => (
-                  <span
-                    key={chain}
-                    className="rounded-md border border-border bg-surface px-2.5 py-1 text-xs font-medium text-fg"
-                  >
-                    {chain}
-                  </span>
-                ))}
+        {/* Responsive 2-Column Layout on Desktop, Stacked on Mobile */}
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* LEFT COLUMN (7 cols on desktop): Audit, Roadmap, Anti-Sybil */}
+          <div className="space-y-6 lg:col-span-7">
+            {/* Score Breakdown */}
+            <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                Auditoria Fundamentalista (6 Pilares)
+              </h3>
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                {BREAKDOWN_META.map(({ key, label, max }) => {
+                  const val = project.score_breakdown?.[key] ?? 0;
+                  const pct = Math.min(100, Math.round((val / max) * 100));
+                  const barColor =
+                    pct >= 70
+                      ? "bg-emerald-600 dark:bg-emerald-400"
+                      : pct >= 45
+                      ? "bg-amber-500 dark:bg-amber-400"
+                      : "bg-rose-500 dark:bg-rose-400";
+                  return (
+                    <div
+                      key={key}
+                      className="rounded-xl border border-border bg-canvas p-3"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-fg-secondary">{label}</span>
+                        <span className="font-mono-code font-medium text-fg">
+                          {val}/{max}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-track">
+                        <div
+                          className={`h-full rounded-full ${barColor}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {chainTvlEntries.length > 0 && (
-                <div className="mt-3 space-y-2 rounded-lg border border-border bg-surface p-3.5">
-                  <p className="text-[11px] text-fg-muted">
-                    Distribuição de TVL por rede (DefiLlama)
-                  </p>
-                  {chainTvlEntries.slice(0, 6).map(([chainName, tvlVal]) => {
-                    const share =
-                      totalChainTvl > 0
-                        ? Math.max(1, Math.round((tvlVal / totalChainTvl) * 100))
-                        : 100;
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-border bg-canvas p-4">
+                  <h4 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    Pontos Fortes
+                  </h4>
+                  <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-fg-secondary">
+                    {project.bull_case.map((item, idx) => (
+                      <li key={idx}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-xl border border-border bg-canvas p-4">
+                  <h4 className="text-xs font-semibold text-rose-600 dark:text-rose-400">
+                    Riscos &amp; Red Flags
+                  </h4>
+                  <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-fg-secondary">
+                    {project.red_flags.length > 0 ? (
+                      project.red_flags.map((item, idx) => <li key={idx}>• {item}</li>)
+                    ) : (
+                      <li className="text-fg-muted">Nenhum red flag crítico.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            {/* Roadmap do Projeto */}
+            <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                  Roadmap do Projeto
+                </h3>
+                {project.roadmap_url && (
+                  <a
+                    href={project.roadmap_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-fg-secondary hover:text-fg"
+                  >
+                    Fonte oficial
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+
+              <p className="mt-2 text-xs text-fg-secondary">{project.roadmap_summary}</p>
+
+              {project.roadmap_milestones && project.roadmap_milestones.length > 0 ? (
+                <div className="mt-4 space-y-3 border-l border-border pl-4">
+                  {project.roadmap_milestones.map((m, idx) => {
+                    const statusDot =
+                      m.status === "DONE"
+                        ? "bg-emerald-500 dark:bg-emerald-400"
+                        : m.status === "IN_PROGRESS"
+                        ? "bg-amber-500 dark:bg-amber-400"
+                        : "bg-fg-muted";
+                    const statusLabel =
+                      m.status === "DONE"
+                        ? "Concluído"
+                        : m.status === "IN_PROGRESS"
+                        ? "Em andamento"
+                        : "Próximo";
                     return (
-                      <div key={chainName}>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-fg">{chainName}</span>
-                          <span className="font-mono-code text-fg-secondary">
-                            {formatUsd(tvlVal)} ({share}%)
+                      <div
+                        key={idx}
+                        className="relative rounded-xl border border-border bg-canvas p-3"
+                      >
+                        <span
+                          className={`absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full ring-4 ring-surface ${statusDot}`}
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-mono-code text-[11px] font-semibold text-fg-muted">
+                            {m.phase}
+                          </span>
+                          <span className="text-[10px] font-medium text-fg-muted">
+                            {statusLabel}
                           </span>
                         </div>
-                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-track">
-                          <div
-                            className="h-full rounded-full bg-emerald-600 dark:bg-emerald-400"
-                            style={{ width: `${share}%` }}
-                          />
-                        </div>
+                        <h4 className="mt-1 text-xs font-semibold text-fg">{m.title}</h4>
+                        {m.details && (
+                          <p className="mt-1 text-xs text-fg-secondary">{m.details}</p>
+                        )}
                       </div>
                     );
                   })}
                 </div>
+              ) : (
+                <p className="mt-3 text-xs text-fg-muted">
+                  Clique em reanalisar (↻) no topo para extrair as fases do roadmap.
+                </p>
               )}
-            </div>
-          )}
-        </section>
+            </section>
 
-        {/* Waitlist & Referral */}
-        <section className="mt-7 border-t border-border pt-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
-              Waitlist &amp; Referral
-            </h3>
-            <div className="flex items-center gap-2 text-[11px]">
-              <span
-                className={`rounded px-2 py-0.5 font-medium ${
-                  project.has_waitlist
-                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
-                    : "bg-elevated text-fg-muted"
-                }`}
-              >
-                {project.has_waitlist ? "Waitlist ativa" : "Sem waitlist"}
-              </span>
-              <span
-                className={`rounded px-2 py-0.5 font-medium ${
-                  project.has_referral
-                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                    : "bg-elevated text-fg-muted"
-                }`}
-              >
-                {project.has_referral ? "Com Referral" : "Sem referral"}
-              </span>
-            </div>
-          </div>
-
-          {project.waitlist_notes && (
-            <p className="mt-2 text-xs text-fg-secondary">{project.waitlist_notes}</p>
-          )}
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {project.waitlist_url && (
-              <a
-                href={project.waitlist_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-fg transition hover:border-border-strong"
-              >
-                Abrir Waitlist
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-            {project.referral_url && (
-              <a
-                href={project.referral_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-fg transition hover:border-border-strong"
-              >
-                Programa de Referral / Pontos
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-
-          <form
-            onSubmit={handleSaveRef}
-            className="mt-3 grid gap-2 rounded-lg border border-border bg-surface p-3 sm:grid-cols-2"
-          >
-            <div>
-              <label className="block text-[11px] text-fg-muted">
-                Seu link de Referral (salvo no projeto)
-              </label>
-              <div className="mt-1 flex gap-1.5">
-                <input
-                  type="text"
-                  value={refInput}
-                  onChange={(e) => setRefInput(e.target.value)}
-                  placeholder="https://projeto.xyz?ref=SEUCODIGO"
-                  className="w-full rounded-md border border-border bg-canvas px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
-                />
-                {(project.user_referral_link || refInput) && (
-                  <button
-                    type="button"
-                    onClick={handleCopyRef}
-                    title="Copiar seu link de referral"
-                    className="rounded-md border border-border bg-canvas px-2 text-fg-secondary hover:text-fg"
-                  >
-                    {copiedRef ? (
-                      <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                    ) : (
-                      <Copy className="h-3.5 w-3.5" />
-                    )}
-                  </button>
+            {/* Plano Estratégico Anti-Sybil */}
+            <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                  Plano Estratégico Anti-Sybil
+                </h3>
+                {project.tasks.length > 0 && (
+                  <span className="font-mono-code text-xs text-fg-secondary">
+                    {completedCount}/{project.tasks.length} concluídas
+                  </span>
                 )}
               </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] text-fg-muted">
-                Link da Waitlist (opcional)
-              </label>
-              <div className="mt-1 flex gap-1.5">
-                <input
-                  type="text"
-                  value={waitlistInput}
-                  onChange={(e) => setWaitlistInput(e.target.value)}
-                  placeholder="https://projeto.xyz/waitlist"
-                  className="w-full rounded-md border border-border bg-canvas px-2.5 py-1.5 text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={savingRef}
-                  className="shrink-0 rounded-md bg-btn px-3 py-1.5 text-xs font-medium text-btn-fg transition hover:opacity-90 disabled:opacity-50"
-                >
-                  {savingRef ? "..." : "Salvar"}
-                </button>
-              </div>
-            </div>
-          </form>
-        </section>
-
-        {/* Roadmap do Projeto */}
-        <section className="mt-7 border-t border-border pt-6">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
-              Roadmap do Projeto
-            </h3>
-            {project.roadmap_url && (
-              <a
-                href={project.roadmap_url}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-fg-secondary hover:text-fg"
-              >
-                Ver fonte oficial
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
-
-          <p className="mt-2 text-xs text-fg-secondary">{project.roadmap_summary}</p>
-
-          {project.roadmap_milestones && project.roadmap_milestones.length > 0 ? (
-            <div className="mt-4 space-y-3 border-l border-border pl-4">
-              {project.roadmap_milestones.map((m, idx) => {
-                const statusDot =
-                  m.status === "DONE"
-                    ? "bg-emerald-500 dark:bg-emerald-400"
-                    : m.status === "IN_PROGRESS"
-                    ? "bg-amber-500 dark:bg-amber-400"
-                    : "bg-fg-muted";
-                const statusLabel =
-                  m.status === "DONE"
-                    ? "Concluído"
-                    : m.status === "IN_PROGRESS"
-                    ? "Em andamento"
-                    : "Próximo";
-                return (
-                  <div key={idx} className="relative rounded-lg border border-border bg-surface p-3">
-                    <span
-                      className={`absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full ring-4 ring-canvas ${statusDot}`}
-                    />
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-mono-code text-[11px] font-semibold text-fg-muted">
-                        {m.phase}
-                      </span>
-                      <span className="text-[10px] font-medium text-fg-muted">
-                        {statusLabel}
-                      </span>
-                    </div>
-                    <h4 className="mt-1 text-xs font-semibold text-fg">{m.title}</h4>
-                    {m.details && (
-                      <p className="mt-1 text-xs text-fg-secondary">{m.details}</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="mt-3 text-xs text-fg-muted">
-              Clique no botão de reanalisar (↻) no topo para extrair as fases do roadmap deste projeto.
-            </p>
-          )}
-        </section>
-
-        {/* Score Breakdown */}
-        <section className="mt-7 border-t border-border pt-6">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
-            Auditoria Fundamentalista (6 Pilares)
-          </h3>
-          <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
-            {BREAKDOWN_META.map(({ key, label, max }) => {
-              const val = project.score_breakdown?.[key] ?? 0;
-              const pct = Math.min(100, Math.round((val / max) * 100));
-              const barColor =
-                pct >= 70
-                  ? "bg-emerald-600 dark:bg-emerald-400"
-                  : pct >= 45
-                  ? "bg-amber-500 dark:bg-amber-400"
-                  : "bg-rose-500 dark:bg-rose-400";
-              return (
-                <div
-                  key={key}
-                  className="rounded-lg border border-border bg-surface p-3"
-                >
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-fg-secondary">{label}</span>
-                    <span className="font-mono-code font-medium text-fg">
-                      {val}/{max}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-track">
-                    <div
-                      className={`h-full rounded-full ${barColor}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Bull case & Red flags */}
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <h4 className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                Pontos Fortes
-              </h4>
-              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-fg-secondary">
-                {project.bull_case.map((item, idx) => (
-                  <li key={idx}>• {item}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <h4 className="text-xs font-semibold text-rose-600 dark:text-rose-400">
-                Riscos &amp; Red Flags
-              </h4>
-              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-fg-secondary">
-                {project.red_flags.length > 0 ? (
-                  project.red_flags.map((item, idx) => <li key={idx}>• {item}</li>)
-                ) : (
-                  <li className="text-fg-muted">Nenhum red flag crítico.</li>
-                )}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* Anti-Sybil Strategic Plan */}
-        <section className="mt-7 border-t border-border pt-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
-              Plano Estratégico Anti-Sybil
-            </h3>
-            {project.tasks.length > 0 && (
-              <span className="font-mono-code text-xs text-fg-secondary">
-                {completedCount}/{project.tasks.length} concluídas
-              </span>
-            )}
-          </div>
-          <p className="mt-2 text-xs text-fg-secondary">{project.anti_sybil_strategy}</p>
-
-          {project.tasks.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-border bg-surface p-3.5 text-xs text-fg-muted">
-              Score abaixo de 70 pontos — plano de farming não recomendado.
-            </p>
-          ) : (
-            <div className="mt-3 space-y-2">
-              {project.tasks.map((task) => (
-                <div
-                  key={task.id}
-                  className={`rounded-lg border p-3.5 transition ${
-                    task.completed
-                      ? "border-border/60 bg-surface/60 opacity-65"
-                      : "border-border bg-surface"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <button
-                      onClick={() => handleTaskClick(task.id, task.completed)}
-                      disabled={togglingTaskId === task.id}
-                      className="mt-0.5 text-emerald-600 dark:text-emerald-400 shrink-0"
-                    >
-                      {togglingTaskId === task.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : task.completed ? (
-                        <CheckCircle2 className="h-4 w-4" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-fg-muted hover:text-fg" />
-                      )}
-                    </button>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4
-                          className={`text-xs font-semibold ${
-                            task.completed
-                              ? "line-through text-fg-muted"
-                              : "text-fg"
-                          }`}
-                        >
-                          {task.title}
-                        </h4>
-                        <span className="font-mono-code text-[10px] text-fg-muted">
-                          {task.priority} · {task.frequency} · {task.estimated_cost_usd}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs leading-relaxed text-fg-secondary">
-                        {task.description}
-                      </p>
-                      {task.anti_sybil_tip && (
-                        <p className="mt-1.5 text-[11px] text-fg-muted">
-                          <span className="font-medium text-fg">Dica Anti-Sybil:</span>{" "}
-                          {task.anti_sybil_tip}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Roadmap Monitor */}
-        <section className="mt-7 border-t border-border pt-6 pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
-                Monitor de Roadmap &amp; Docs
-              </h3>
-              <p className="mt-1 font-mono-code text-[11px] text-fg-muted">
-                {project.monitored_url || project.url}
+              <p className="mt-2 text-xs text-fg-secondary">
+                {project.anti_sybil_strategy}
               </p>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onToggleMonitor(!project.monitoring_enabled)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
-              >
-                {project.monitoring_enabled ? (
-                  <>
-                    <Bell className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                    Ativo
-                  </>
-                ) : (
-                  <>
-                    <BellOff className="h-3.5 w-3.5 text-fg-muted" />
-                    Pausado
-                  </>
-                )}
-              </button>
+              {project.tasks.length === 0 ? (
+                <p className="mt-3 rounded-xl border border-border bg-canvas p-3.5 text-xs text-fg-muted">
+                  Score abaixo de 70 pontos — plano de farming não recomendado.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {project.tasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className={`rounded-xl border p-3.5 transition ${
+                        task.completed
+                          ? "border-border/60 bg-canvas/60 opacity-65"
+                          : "border-border bg-canvas"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <button
+                          onClick={() => handleTaskClick(task.id, task.completed)}
+                          disabled={togglingTaskId === task.id}
+                          className="mt-0.5 text-emerald-600 dark:text-emerald-400 shrink-0"
+                        >
+                          {togglingTaskId === task.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : task.completed ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <Circle className="h-4 w-4 text-fg-muted hover:text-fg" />
+                          )}
+                        </button>
 
-              <button
-                onClick={handleCheckNow}
-                disabled={checkingUpdate}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
-              >
-                {checkingUpdate ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
-                Checar
-              </button>
-            </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4
+                              className={`text-xs font-semibold ${
+                                task.completed
+                                  ? "line-through text-fg-muted"
+                                  : "text-fg"
+                              }`}
+                            >
+                              {task.title}
+                            </h4>
+                            <span className="font-mono-code text-[10px] text-fg-muted">
+                              {task.priority} · {task.frequency} · {task.estimated_cost_usd}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs leading-relaxed text-fg-secondary">
+                            {task.description}
+                          </p>
+                          {task.anti_sybil_tip && (
+                            <p className="mt-1.5 text-[11px] text-fg-muted">
+                              <span className="font-medium text-fg">Anti-Sybil:</span>{" "}
+                              {task.anti_sybil_tip}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
 
-          {lastCheckMsg && (
-            <p className="mt-2.5 text-xs text-emerald-600 dark:text-emerald-400">
-              {lastCheckMsg}
-            </p>
-          )}
+          {/* RIGHT COLUMN (5 cols on desktop): Anexo Links, Redes, Waitlist/Referral, Monitor */}
+          <div className="space-y-6 lg:col-span-5">
+            {/* Anexo — Canais & Links Vinculados */}
+            <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                  Anexo · Links ({attachedLinks.length})
+                </h3>
+                <div className="flex items-center gap-2.5 text-[11px] text-fg-muted">
+                  <span
+                    className={
+                      project.twitter_url
+                        ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                        : ""
+                    }
+                  >
+                    X {project.twitter_url ? "✓" : "—"}
+                  </span>
+                  <span
+                    className={
+                      project.telegram_url
+                        ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                        : ""
+                    }
+                  >
+                    TG {project.telegram_url ? "✓" : "—"}
+                  </span>
+                  <span
+                    className={
+                      project.instagram_url
+                        ? "text-emerald-600 dark:text-emerald-400 font-medium"
+                        : ""
+                    }
+                  >
+                    IG {project.instagram_url ? "✓" : "—"}
+                  </span>
+                </div>
+              </div>
 
-          {project.roadmap_snapshots.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {project.roadmap_snapshots.map((snap) => (
-                <div
-                  key={snap.id}
-                  className="rounded-lg border border-border bg-surface p-3 text-xs"
-                >
-                  <div className="flex items-center justify-between text-[11px] text-fg-muted">
-                    <span>{formatRelativeDate(snap.detected_at)}</span>
-                    <span>{snap.alert_sent ? "Telegram ✓" : "Local"}</span>
+              <div className="mt-3 space-y-2">
+                {attachedLinks.map((item, idx) => (
+                  <a
+                    key={`${item.url}-${idx}`}
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between gap-2 rounded-xl border border-border bg-canvas px-3 py-2 text-xs transition hover:border-border-strong hover:bg-elevated"
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-surface">
+                        {renderLinkIcon(item.type)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-medium text-fg">{item.label}</p>
+                        <p className="truncate font-mono-code text-[11px] text-fg-muted">
+                          {item.url.replace(/^https?:\/\/(www\.)?/, "")}
+                        </p>
+                      </div>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
+                  </a>
+                ))}
+              </div>
+            </section>
+
+            {/* Redes em Operação */}
+            <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                <Layers className="h-3.5 w-3.5" />
+                Redes em Operação
+              </h3>
+
+              {project.chains.length === 0 ? (
+                <p className="mt-2 text-xs text-fg-muted">
+                  Nenhuma rede blockchain específica detectada automaticamente.
+                </p>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {project.chains.map((chain) => (
+                      <span
+                        key={chain}
+                        className="rounded-md border border-border bg-canvas px-2.5 py-1 text-xs font-medium text-fg"
+                      >
+                        {chain}
+                      </span>
+                    ))}
                   </div>
-                  <p className="mt-1.5 whitespace-pre-line text-fg-secondary">
-                    {snap.diff_summary}
+
+                  {chainTvlEntries.length > 0 && (
+                    <div className="space-y-2 rounded-xl border border-border bg-canvas p-3.5">
+                      <p className="text-[11px] text-fg-muted">
+                        Distribuição de TVL por rede
+                      </p>
+                      {chainTvlEntries.slice(0, 6).map(([chainName, tvlVal]) => {
+                        const share =
+                          totalChainTvl > 0
+                            ? Math.max(1, Math.round((tvlVal / totalChainTvl) * 100))
+                            : 100;
+                        return (
+                          <div key={chainName}>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-fg">{chainName}</span>
+                              <span className="font-mono-code text-fg-secondary">
+                                {formatUsd(tvlVal)} ({share}%)
+                              </span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-track">
+                              <div
+                                className="h-full rounded-full bg-emerald-600 dark:bg-emerald-400"
+                                style={{ width: `${share}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
+            {/* Waitlist & Referral */}
+            <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                  Waitlist &amp; Referral
+                </h3>
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span
+                    className={`rounded px-2 py-0.5 font-medium ${
+                      project.has_waitlist
+                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                        : "bg-elevated text-fg-muted"
+                    }`}
+                  >
+                    {project.has_waitlist ? "Waitlist" : "Sem waitlist"}
+                  </span>
+                  <span
+                    className={`rounded px-2 py-0.5 font-medium ${
+                      project.has_referral
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                        : "bg-elevated text-fg-muted"
+                    }`}
+                  >
+                    {project.has_referral ? "Referral" : "Sem referral"}
+                  </span>
+                </div>
+              </div>
+
+              {project.waitlist_notes && (
+                <p className="mt-2 text-xs text-fg-secondary">{project.waitlist_notes}</p>
+              )}
+
+              {(project.waitlist_url || project.referral_url) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {project.waitlist_url && (
+                    <a
+                      href={project.waitlist_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-3 py-1.5 text-xs font-medium text-fg transition hover:border-border-strong"
+                    >
+                      Abrir Waitlist
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {project.referral_url && (
+                    <a
+                      href={project.referral_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-3 py-1.5 text-xs font-medium text-fg transition hover:border-border-strong"
+                    >
+                      Programa de Referral
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              )}
+
+              <form onSubmit={handleSaveRef} className="mt-3 space-y-2.5">
+                <div>
+                  <label className="block text-[11px] text-fg-muted">
+                    Seu link de Referral
+                  </label>
+                  <div className="mt-1 flex gap-1.5">
+                    <input
+                      type="text"
+                      value={refInput}
+                      onChange={(e) => setRefInput(e.target.value)}
+                      placeholder="https://projeto.xyz?ref=SEUCODIGO"
+                      className="w-full rounded-lg border border-border bg-canvas px-2.5 py-2 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+                    />
+                    {(project.user_referral_link || refInput) && (
+                      <button
+                        type="button"
+                        onClick={handleCopyRef}
+                        title="Copiar link de referral"
+                        className="rounded-lg border border-border bg-canvas px-2.5 text-fg-secondary hover:text-fg"
+                      >
+                        {copiedRef ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-fg-muted">
+                    Link da Waitlist (opcional)
+                  </label>
+                  <div className="mt-1 flex gap-1.5">
+                    <input
+                      type="text"
+                      value={waitlistInput}
+                      onChange={(e) => setWaitlistInput(e.target.value)}
+                      placeholder="https://projeto.xyz/waitlist"
+                      className="w-full rounded-lg border border-border bg-canvas px-2.5 py-2 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={savingRef}
+                      className="shrink-0 rounded-lg bg-btn px-3 py-2 text-xs font-medium text-btn-fg transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      {savingRef ? "..." : "Salvar"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </section>
+
+            {/* Monitor de Roadmap & Docs */}
+            <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                    Monitor de Updates
+                  </h3>
+                  <p className="mt-1 truncate font-mono-code text-[11px] text-fg-muted">
+                    {project.monitored_url || project.url}
                   </p>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => onToggleMonitor(!project.monitoring_enabled)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas px-2.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
+                  >
+                    {project.monitoring_enabled ? (
+                      <>
+                        <Bell className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        Ativo
+                      </>
+                    ) : (
+                      <>
+                        <BellOff className="h-3.5 w-3.5 text-fg-muted" />
+                        Pausado
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={handleCheckNow}
+                    disabled={checkingUpdate}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas px-2.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg disabled:opacity-50"
+                  >
+                    {checkingUpdate ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                    Checar
+                  </button>
+                </div>
+              </div>
+
+              {lastCheckMsg && (
+                <p className="mt-2.5 text-xs text-emerald-600 dark:text-emerald-400">
+                  {lastCheckMsg}
+                </p>
+              )}
+
+              {project.roadmap_snapshots.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {project.roadmap_snapshots.map((snap) => (
+                    <div
+                      key={snap.id}
+                      className="rounded-xl border border-border bg-canvas p-3 text-xs"
+                    >
+                      <div className="flex items-center justify-between text-[11px] text-fg-muted">
+                        <span>{formatRelativeDate(snap.detected_at)}</span>
+                        <span>{snap.alert_sent ? "Telegram ✓" : "Local"}</span>
+                      </div>
+                      <p className="mt-1.5 whitespace-pre-line text-fg-secondary">
+                        {snap.diff_summary}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
       </div>
     </div>
   );
