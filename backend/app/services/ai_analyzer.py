@@ -165,19 +165,22 @@ Notes: {' | '.join(onchain.source_notes)}
         except Exception as exc:
             logger.warning("Could not list Gemini models: %s", exc)
 
-        # Prefer newest flash models first, then pro
+        # Prefer models with highest free-tier availability first (flash-lite / flash)
         def _rank(name: str) -> tuple[int, str]:
             low = name.lower()
-            if "flash" in low and "lite" not in low:
+            if "flash-lite" in low:
                 return (0, name)
-            if "flash" in low:
+            if "3-flash" in low or "3.0-flash" in low:
                 return (1, name)
-            if "pro" in low:
+            if "2.5-flash" in low:
                 return (2, name)
-            return (3, name)
+            if "flash" in low:
+                return (3, name)
+            if "pro" in low:
+                return (4, name)
+            return (5, name)
 
-        # Sort by preference, newest version first within same tier
-        found.sort(key=lambda n: (_rank(n)[0], n), reverse=False)
+        found.sort(key=lambda n: (_rank(n)[0], n))
         return found
 
     def _run_gemini_sync(self, prompt_context: str) -> DueDiligenceReport:
@@ -217,8 +220,11 @@ Notes: {' | '.join(onchain.source_notes)}
             except Exception as exc:
                 last_exc = exc
                 err_str = str(exc)
-                if "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str:
-                    logger.warning("Gemini model %s unavailable, trying next...", model_name)
+                if any(
+                    tok in err_str
+                    for tok in ("404", "NOT_FOUND", "no longer available", "429", "RESOURCE_EXHAUSTED")
+                ):
+                    logger.warning("Gemini model %s unavailable/exhausted, trying next...", model_name)
                     continue
                 raise
 
