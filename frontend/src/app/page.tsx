@@ -253,10 +253,10 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] pb-12">
-      {/* Floating Top Navbar */}
-      <div className="sticky top-0 z-40 px-3 pt-2 sm:px-6 sm:pt-3">
-        <header className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-2xl border border-border bg-surface/90 px-3.5 py-2.5 shadow-sm backdrop-blur-md sm:px-4">
+    <div className="min-h-[100dvh] w-full pb-12">
+      {/* Floating Top Navbar — Full Fluid Responsive Width */}
+      <div className="sticky top-0 z-40 w-full px-2.5 pt-2 sm:px-5 sm:pt-3 lg:px-8 xl:px-10">
+        <header className="mx-auto flex w-full max-w-[1800px] items-center justify-between gap-2 rounded-2xl border border-border bg-surface/90 px-3 py-2.5 shadow-sm backdrop-blur-md sm:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <span
               className={`h-2 w-2 rounded-full shrink-0 ${
@@ -315,8 +315,8 @@ export default function DashboardPage() {
         </header>
       </div>
 
-      {/* Main Content */}
-      <main className="mx-auto max-w-6xl px-3 pt-5 sm:px-6 sm:pt-6">
+      {/* Main Content — Full Fluid Responsive Width */}
+      <main className="mx-auto w-full max-w-[1800px] px-2.5 pt-4 sm:px-5 sm:pt-6 lg:px-8 xl:px-10">
         {/* Top View Switch + Inline KPI Strip */}
         <section className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex self-start rounded-xl border border-border bg-surface p-1">
@@ -422,8 +422,8 @@ export default function DashboardPage() {
               <AnalyzeForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
             </section>
 
-            {/* Filter Tabs (Horizontally Scrollable on Mobile) & Search */}
-            <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {/* Filter Tabs (Horizontally Scrollable on Mobile) & Sort/Search */}
+            <section className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="no-scrollbar flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
                 {VERDICT_TABS.map((tab) => (
                   <button
@@ -478,7 +478,7 @@ export default function DashboardPage() {
                   Nenhum projeto encontrado. Cole a URL de um protocolo acima ou abra &ldquo;Descobrir Alpha&rdquo;.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                   {sortedProjects.map((proj) => (
                     <ProjectCard
                       key={proj.id}

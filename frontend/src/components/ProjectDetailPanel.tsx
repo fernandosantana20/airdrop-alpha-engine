@@ -312,9 +312,9 @@ export function ProjectDetailPanel({
 
   return (
     <div className="fixed inset-0 z-50 h-[100dvh] w-full overflow-y-auto bg-canvas">
-      {/* Floating Sticky Top Bar */}
-      <div className="sticky top-0 z-30 px-3 pt-2 sm:px-6 sm:pt-3">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 rounded-2xl border border-border bg-surface/90 px-3 py-2 shadow-sm backdrop-blur-md sm:px-4">
+      {/* Floating Sticky Top Bar — Full Fluid Responsive Width */}
+      <div className="sticky top-0 z-30 w-full px-2.5 pt-2 sm:px-5 sm:pt-3 lg:px-8 xl:px-10">
+        <div className="mx-auto flex w-full max-w-[1800px] items-center justify-between gap-2 rounded-2xl border border-border bg-surface/90 px-3 py-2 shadow-sm backdrop-blur-md sm:px-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <button
               onClick={onClose}
@@ -385,8 +385,8 @@ export function ProjectDetailPanel({
         </div>
       </div>
 
-      {/* Full-Width Responsive Body */}
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6">
+      {/* Full-Width Fluid Responsive Body */}
+      <div className="mx-auto w-full max-w-[1800px] px-2.5 pb-16 pt-4 sm:px-5 sm:pt-6 lg:px-8 xl:px-10">
         {/* Hero Overview */}
         <section className="rounded-2xl border border-border bg-surface p-4 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -551,10 +551,10 @@ export function ProjectDetailPanel({
           </section>
         </div>
 
-        {/* Responsive 2-Column Layout on Desktop, Stacked on Mobile */}
+        {/* Responsive 2-Column Layout on Desktop (8/4 on xl), Stacked on Mobile */}
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* LEFT COLUMN (7 cols on desktop): Provenance, Audit, Roadmap, Anti-Sybil */}
-          <div className="space-y-6 lg:col-span-7">
+          {/* LEFT COLUMN: Provenance, Audit, Roadmap, Anti-Sybil */}
+          <div className="min-w-0 space-y-6 lg:col-span-7 xl:col-span-8">
             {/* Deep Provenance & Profitability Audit */}
             {project.deep_metrics &&
               Object.keys(project.deep_metrics).length > 0 && (
@@ -1011,8 +1011,8 @@ export function ProjectDetailPanel({
             </section>
           </div>
 
-          {/* RIGHT COLUMN (5 cols on desktop): Anexo Links, Redes, Waitlist/Referral, Monitor */}
-          <div className="space-y-6 lg:col-span-5">
+          {/* RIGHT COLUMN: Anexo Links, Redes, Waitlist/Referral, ROI Tracker, Monitor */}
+          <div className="min-w-0 space-y-6 lg:col-span-5 xl:col-span-4">
             {/* Anexo — Canais & Links Vinculados */}
             <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">

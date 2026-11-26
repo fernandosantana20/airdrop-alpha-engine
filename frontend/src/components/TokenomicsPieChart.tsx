@@ -62,7 +62,7 @@ export function TokenomicsPieChart({ deepMetrics }: TokenomicsPieChartProps) {
       </div>
 
       {/* Supply, Float & FDV Strip */}
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div className="rounded-xl border border-border bg-canvas px-2.5 py-2">
           <p className="text-[10px] text-fg-muted">Total Supply</p>
           <p className="mt-0.5 truncate font-mono-code text-xs font-semibold text-fg">
