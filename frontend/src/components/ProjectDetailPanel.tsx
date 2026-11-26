@@ -436,8 +436,152 @@ export function ProjectDetailPanel({
 
         {/* Responsive 2-Column Layout on Desktop, Stacked on Mobile */}
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* LEFT COLUMN (7 cols on desktop): Audit, Roadmap, Anti-Sybil */}
+          {/* LEFT COLUMN (7 cols on desktop): Provenance, Audit, Roadmap, Anti-Sybil */}
           <div className="space-y-6 lg:col-span-7">
+            {/* Deep Provenance & Profitability Audit */}
+            {project.deep_metrics &&
+              Object.keys(project.deep_metrics).length > 0 && (
+                <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                      Procedência, Segurança &amp; Rentabilidade
+                    </h3>
+                    {project.deep_metrics.profitability_rating && (
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${
+                          project.deep_metrics.profitability_rating === "ALTA"
+                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                            : project.deep_metrics.profitability_rating === "MÉDIA"
+                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                            : "bg-rose-500/15 text-rose-700 dark:text-rose-400"
+                        }`}
+                      >
+                        Rentabilidade: {project.deep_metrics.profitability_rating}
+                      </span>
+                    )}
+                  </div>
+
+                  {project.deep_metrics.asymmetry_summary && (
+                    <p className="mt-2 text-xs leading-relaxed text-fg-secondary">
+                      {project.deep_metrics.asymmetry_summary}
+                    </p>
+                  )}
+
+                  {/* Entry Model / Capital / Revenue / Domain Age */}
+                  <div className="mt-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    <div className="rounded-xl border border-border bg-canvas p-3">
+                      <p className="text-[11px] text-fg-muted">Modelo</p>
+                      <p className="mt-1 text-xs font-semibold text-fg">
+                        {project.deep_metrics.cost_model === "FREE_TESTNET"
+                          ? "Gratuito / Testnet"
+                          : project.deep_metrics.cost_model === "HYBRID"
+                          ? "Híbrido"
+                          : "Exige Capital"}
+                      </p>
+                      <p className="mt-0.5 truncate text-[10px] text-fg-muted">
+                        {project.deep_metrics.estimated_min_capital_usd || "—"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-canvas p-3">
+                      <p className="text-[11px] text-fg-muted">Fees (30d)</p>
+                      <p className="mt-1 font-mono-code text-xs font-semibold text-fg">
+                        {formatUsd(project.deep_metrics.fees_30d_usd)}
+                      </p>
+                      <p className="mt-0.5 font-mono-code text-[10px] text-fg-muted">
+                        24h: {formatUsd(project.deep_metrics.fees_24h_usd)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-canvas p-3">
+                      <p className="text-[11px] text-fg-muted">Idade Domínio</p>
+                      <p className="mt-1 font-mono-code text-xs font-semibold text-fg">
+                        {project.deep_metrics.domain_age_days != null
+                          ? `${project.deep_metrics.domain_age_days} dias`
+                          : "N/A"}
+                      </p>
+                      <p className="mt-0.5 font-mono-code text-[10px] text-fg-muted">
+                        {project.deep_metrics.domain_created_at || "RDAP indisponível"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-canvas p-3">
+                      <p className="text-[11px] text-fg-muted">Diluição / Hacks</p>
+                      <p className="mt-1 text-xs font-semibold text-fg">
+                        {project.deep_metrics.saturation_risk || "—"}
+                      </p>
+                      <p
+                        className={`mt-0.5 text-[10px] font-medium ${
+                          (project.deep_metrics.hacks_count ?? 0) > 0
+                            ? "text-rose-600 dark:text-rose-400"
+                            : "text-emerald-600 dark:text-emerald-400"
+                        }`}
+                      >
+                        {(project.deep_metrics.hacks_count ?? 0) > 0
+                          ? `${project.deep_metrics.hacks_count} hack(s)`
+                          : "0 hacks"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Historical Hacks Alert if any */}
+                  {project.deep_metrics.hacks_history &&
+                    project.deep_metrics.hacks_history.length > 0 && (
+                      <div className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-700 dark:text-rose-300">
+                        <p className="font-semibold">
+                          Alerta de Segurança — Histórico de Exploit Registrado:
+                        </p>
+                        <ul className="mt-1 space-y-1">
+                          {project.deep_metrics.hacks_history.map((h, i) => (
+                            <li key={i}>
+                              • {h.date || "Data N/A"} — {formatUsd(h.amount_usd)} ({h.classification} · {h.technique})
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                  {/* 7-Point Provenance Verification Checklist */}
+                  {project.deep_metrics.provenance_checks &&
+                    project.deep_metrics.provenance_checks.length > 0 && (
+                      <div className="mt-4 space-y-1.5">
+                        {project.deep_metrics.provenance_checks.map((chk, idx) => {
+                          const badgeStyle =
+                            chk.status === "PASS"
+                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                              : chk.status === "WARN"
+                              ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                              : "bg-rose-500/15 text-rose-700 dark:text-rose-400";
+                          const symbol =
+                            chk.status === "PASS"
+                              ? "OK"
+                              : chk.status === "WARN"
+                              ? "ATENÇÃO"
+                              : "RISCO";
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-start justify-between gap-3 rounded-xl border border-border bg-canvas px-3 py-2 text-xs"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-medium text-fg">{chk.label}</p>
+                                <p className="mt-0.5 text-[11px] text-fg-secondary">
+                                  {chk.detail}
+                                </p>
+                              </div>
+                              <span
+                                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${badgeStyle}`}
+                              >
+                                {symbol}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                </section>
+              )}
+
             {/* Score Breakdown */}
             <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">

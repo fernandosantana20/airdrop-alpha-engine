@@ -13,6 +13,45 @@ export interface RoadmapMilestone {
   details: string;
 }
 
+export interface ProvenanceCheck {
+  label: string;
+  status: "PASS" | "WARN" | "FAIL" | string;
+  detail: string;
+}
+
+export interface HackIncident {
+  name?: string;
+  date?: string | null;
+  amount_usd?: number | null;
+  classification?: string;
+  technique?: string;
+}
+
+export interface DeepMetrics {
+  cost_model?: "FREE_TESTNET" | "CAPITAL_REQUIRED" | "HYBRID" | string;
+  cost_model_label?: string;
+  estimated_min_capital_usd?: string;
+  profitability_rating?: "ALTA" | "MÉDIA" | "BAIXA" | string;
+  saturation_risk?: "BAIXA" | "MÉDIA" | "ALTA" | string;
+  asymmetry_summary?: string;
+  fees_24h_usd?: number | null;
+  fees_30d_usd?: number | null;
+  fees_all_time_usd?: number | null;
+  mcap_usd?: number | null;
+  token_symbol?: string | null;
+  is_tokenless?: boolean;
+  domain_created_at?: string | null;
+  domain_age_days?: number | null;
+  audits_count?: number;
+  audit_links?: string[];
+  hacks_count?: number;
+  hacks_history?: HackIncident[];
+  tier1_investors?: string[];
+  github_days_since_push?: number | null;
+  github_languages?: string[];
+  provenance_checks?: ProvenanceCheck[];
+}
+
 export interface ScoreBreakdown {
   product_utility: number;
   backing_funding: number;
@@ -75,6 +114,10 @@ export interface ProjectListItem {
   has_referral: boolean;
   waitlist_url: string | null;
   user_referral_link: string | null;
+  cost_model?: string | null;
+  profitability_rating?: string | null;
+  fees_30d_usd?: number | null;
+  hacks_count?: number;
 }
 
 export interface ProjectDetail {
@@ -103,6 +146,7 @@ export interface ProjectDetail {
   verdict: Verdict;
   analysis_mode: "gemini" | "heuristic" | string;
   score_breakdown: ScoreBreakdown;
+  deep_metrics?: DeepMetrics;
   executive_summary: string;
   bull_case: string[];
   red_flags: string[];

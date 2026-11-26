@@ -56,6 +56,8 @@ class ScrapedProjectData:
     has_referral: bool = False
     waitlist_notes: str = ""
     extracted_milestones: List[Dict[str, str]] = field(default_factory=list)
+    domain_created_at: Optional[str] = None
+    domain_age_days: Optional[int] = None
     github_metrics: Optional[GitHubMetrics] = None
     monitored_url: str = ""
     content_hash: str = ""
@@ -379,6 +381,38 @@ class Web3Scraper:
 
         return links, extras
 
+    async def fetch_domain_provenance(
+        self, client: httpx.AsyncClient, domain: str
+    ) -> Tuple[Optional[str], Optional[int]]:
+        """Query free public RDAP to verify domain registration date and age in days."""
+        if not domain or "." not in domain:
+            return None, None
+        # Use registrable root domain (last 2 labels for common TLDs)
+        parts = domain.split(".")
+        root = ".".join(parts[-2:]) if len(parts) >= 2 else domain
+        try:
+            resp = await client.get(
+                f"https://rdap.org/domain/{root}",
+                headers={"Accept": "application/rdap+json, application/json", "User-Agent": USER_AGENT},
+                follow_redirects=True,
+                timeout=8.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                for ev in data.get("events", []):
+                    if ev.get("eventAction") == "registration" and ev.get("eventDate"):
+                        raw_date = str(ev["eventDate"])
+                        from datetime import datetime, timezone
+
+                        dt = datetime.fromisoformat(raw_date.replace("Z", "+00:00"))
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        age_days = max(0, (datetime.now(timezone.utc) - dt).days)
+                        return dt.strftime("%Y-%m-%d"), age_days
+        except Exception as exc:
+            logger.debug("RDAP lookup skipped for %s: %s", root, exc)
+        return None, None
+
     async def fetch_github_metrics(
         self, client: httpx.AsyncClient, github_url: str
     ) -> Optional[GitHubMetrics]:
@@ -622,6 +656,11 @@ class Web3Scraper:
                 result.github_metrics = await self.fetch_github_metrics(
                     client, result.github_url
                 )
+
+            # Verify domain age via free public RDAP
+            result.domain_created_at, result.domain_age_days = (
+                await self.fetch_domain_provenance(client, domain)
+            )
 
         combined_for_signals = (
             f"{result.title}\n{result.meta_description}\n{result.roadmap_text[:4000]}\n"

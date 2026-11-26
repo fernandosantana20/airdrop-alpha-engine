@@ -26,6 +26,7 @@ from app.schemas import (
     UpdateReferralRequest,
 )
 from app.services.ai_analyzer import AIDueDiligenceAnalyzer
+from app.services.deep_research import build_deep_metrics
 from app.services.monitor import RoadmapMonitor
 from app.services.notifier import TelegramNotifier
 from app.services.onchain_data import DefiLlamaClient
@@ -168,6 +169,10 @@ def list_projects(
                 has_referral=bool(p.has_referral or p.user_referral_link),
                 waitlist_url=p.waitlist_url,
                 user_referral_link=p.user_referral_link,
+                cost_model=(p.deep_metrics or {}).get("cost_model"),
+                profitability_rating=(p.deep_metrics or {}).get("profitability_rating"),
+                fees_30d_usd=(p.deep_metrics or {}).get("fees_30d_usd"),
+                hacks_count=int((p.deep_metrics or {}).get("hacks_count") or 0),
             )
         )
     return items
@@ -287,6 +292,11 @@ async def analyze_project(
     project.verdict = report.verdict
     project.analysis_mode = analysis_mode
     project.score_breakdown = report.score_breakdown.model_dump()
+    project.deep_metrics = build_deep_metrics(
+        scraped=scraped,
+        onchain=onchain,
+        fundamental_score=report.fundamental_score,
+    )
     project.executive_summary = report.executive_summary
     project.bull_case = report.bull_case
     project.red_flags = report.red_flags

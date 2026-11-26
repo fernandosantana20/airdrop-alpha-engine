@@ -14,11 +14,14 @@ logger = logging.getLogger(__name__)
 DEFILLAMA_PROTOCOLS_URL = "https://api.llama.fi/protocols"
 DEFILLAMA_CHAINS_URL = "https://api.llama.fi/v2/chains"
 DEFILLAMA_PROTOCOL_DETAIL_URL = "https://api.llama.fi/protocol/{slug}"
+DEFILLAMA_FEES_SUMMARY_URL = "https://api.llama.fi/summary/fees/{slug}"
+DEFILLAMA_HACKS_URL = "https://api.llama.fi/hacks"
 
 # In-memory TTL cache to avoid re-fetching DefiLlama catalogs on every request
 _CACHE: Dict[str, Any] = {
     "protocols": {"data": None, "fetched_at": 0.0, "ttl": 900.0},
     "chains": {"data": None, "fetched_at": 0.0, "ttl": 900.0},
+    "hacks": {"data": None, "fetched_at": 0.0, "ttl": 1800.0},
 }
 
 
@@ -47,6 +50,10 @@ class OnChainMetrics:
     token_symbol: Optional[str] = None
     audits_count: int = 0
     audit_links: List[str] = field(default_factory=list)
+    fees_24h_usd: Optional[float] = None
+    fees_30d_usd: Optional[float] = None
+    fees_all_time_usd: Optional[float] = None
+    hacks_history: List[Dict[str, Any]] = field(default_factory=list)
     total_funding_usd: Optional[float] = None
     investors: List[str] = field(default_factory=list)
     funding_rounds: List[FundingRound] = field(default_factory=list)
@@ -102,6 +109,16 @@ class DefiLlamaClient:
                     return resp.json()
         except Exception as exc:
             logger.warning("DefiLlama protocol detail failed for %s: %s", slug, exc)
+        return None
+
+    async def _fetch_fees_summary(self, slug: str) -> Optional[Dict[str, Any]]:
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                resp = await client.get(DEFILLAMA_FEES_SUMMARY_URL.format(slug=slug))
+                if resp.status_code == 200:
+                    return resp.json()
+        except Exception as exc:
+            logger.debug("DefiLlama fees summary not available for %s: %s", slug, exc)
         return None
 
     async def fetch_metrics(
@@ -262,5 +279,49 @@ class DefiLlamaClient:
                         f"Matched DefiLlama Chain '{ch.get('name')}' (Chain TVL: ${ch_tvl_float or 0:,.0f})."
                     )
                     break
+
+        # 4. DefiLlama Fees / Revenue summary (real on-chain cashflow)
+        fee_slug = metrics.slug or domain_key
+        if fee_slug:
+            fees_data = await self._fetch_fees_summary(fee_slug)
+            if isinstance(fees_data, dict):
+                t24 = fees_data.get("total24h")
+                t30 = fees_data.get("total30d")
+                tall = fees_data.get("totalAllTime")
+                metrics.fees_24h_usd = float(t24) if t24 is not None else None
+                metrics.fees_30d_usd = float(t30) if t30 is not None else None
+                metrics.fees_all_time_usd = float(tall) if tall is not None else None
+                if metrics.fees_30d_usd:
+                    metrics.source_notes.append(
+                        f"DefiLlama Fees 30d: ${metrics.fees_30d_usd:,.0f}."
+                    )
+
+        # 5. DefiLlama Hacks / Exploits database check
+        hacks_catalog = await self._get_cached_json("hacks", DEFILLAMA_HACKS_URL)
+        if isinstance(hacks_catalog, list):
+            match_keys = {k for k in (target_key, domain_key) if len(k) >= 4}
+            if metrics.matched_protocol:
+                match_keys.add(_normalize_key(metrics.matched_protocol))
+            if metrics.slug:
+                match_keys.add(_normalize_key(metrics.slug))
+
+            for h in hacks_catalog:
+                h_key = _normalize_key(str(h.get("name", "")))
+                if h_key and h_key in match_keys:
+                    ts = h.get("date")
+                    date_str = None
+                    if isinstance(ts, (int, float)):
+                        from datetime import datetime, timezone
+
+                        date_str = datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+                    metrics.hacks_history.append(
+                        {
+                            "name": str(h.get("name", "")),
+                            "date": date_str,
+                            "amount_usd": float(h["amount"]) if h.get("amount") is not None else None,
+                            "classification": str(h.get("classification") or "Unknown"),
+                            "technique": str(h.get("technique") or "Undisclosed"),
+                        }
+                    )
 
         return metrics

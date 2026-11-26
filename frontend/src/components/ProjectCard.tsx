@@ -96,6 +96,20 @@ export function ProjectCard({ project, onSelect }: ProjectCardProps) {
             Referral
           </span>
         )}
+        {project.cost_model && (
+          <span className="rounded border border-border bg-elevated px-1.5 py-0.5 text-[10px] text-fg-secondary">
+            {project.cost_model === "FREE_TESTNET"
+              ? "Free"
+              : project.cost_model === "HYBRID"
+              ? "Híbrido"
+              : "Capital"}
+          </span>
+        )}
+        {(project.hacks_count ?? 0) > 0 && (
+          <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:text-rose-400">
+            Hack
+          </span>
+        )}
       </div>
 
       {/* Metrics & Quick Links */}

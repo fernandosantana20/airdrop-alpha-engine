@@ -91,8 +91,11 @@ Protocol Description: {onchain.description or 'N/A'}
 Chains: {', '.join(onchain.chains) if onchain.chains else 'None indexed'}
 TVL (USD): {f"${onchain.tvl_usd:,.2f}" if onchain.tvl_usd is not None else 'N/A'}
 TVL 7d Change (%): {f"{onchain.tvl_change_7d:.2f}%" if onchain.tvl_change_7d is not None else 'N/A'}
+Fees 24h / 30d (USD): {f"${onchain.fees_24h_usd:,.0f}" if onchain.fees_24h_usd else 'N/A'} / {f"${onchain.fees_30d_usd:,.0f}" if onchain.fees_30d_usd else 'N/A'}
 Existing Token Symbol: {onchain.token_symbol or 'None detected (potentially tokenless)'}
 Verified Audits: {onchain.audits_count} ({', '.join(onchain.audit_links[:3]) if onchain.audit_links else 'No audit links indexed'})
+Historical Hacks / Exploits: {len(onchain.hacks_history)} ({'; '.join(f"{h.get('date')} ${h.get('amount_usd') or 0:,.0f} ({h.get('technique')})" for h in onchain.hacks_history[:3]) if onchain.hacks_history else 'None recorded'})
+Domain Age (RDAP): {f"{scraped.domain_age_days} days (registered {scraped.domain_created_at})" if scraped.domain_age_days is not None else 'Unknown'}
 Total Funding (USD): {f"${onchain.total_funding_usd:,.2f}" if onchain.total_funding_usd is not None else 'N/A'}
 Investors: {', '.join(onchain.investors[:15]) if onchain.investors else 'None indexed'}
 Funding Rounds:
@@ -240,7 +243,17 @@ Notes: {' | '.join(onchain.source_notes)}
             security += 2
         if scraped.twitter_url and (scraped.discord_url or scraped.telegram_url):
             security += 1
+        if scraped.domain_age_days is not None and scraped.domain_age_days < 45:
+            security = max(1, security - 3)
+        if len(onchain.hacks_history) > 0:
+            security = max(1, security - 4)
         security = min(10, security)
+
+        # Bonus on TVL/traction when real 30d fee revenue is proven
+        if onchain.fees_30d_usd and onchain.fees_30d_usd >= 500_000:
+            tvl_score = min(20, tvl_score + 3)
+        elif onchain.fees_30d_usd and onchain.fees_30d_usd >= 50_000:
+            tvl_score = min(20, tvl_score + 2)
 
         breakdown = ScoreBreakdown(
             product_utility=utility,

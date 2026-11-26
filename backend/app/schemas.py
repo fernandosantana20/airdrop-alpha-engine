@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
@@ -227,6 +227,10 @@ class ProjectListItem(BaseModel):
     has_referral: bool = False
     waitlist_url: Optional[str] = None
     user_referral_link: Optional[str] = None
+    cost_model: Optional[str] = None
+    profitability_rating: Optional[str] = None
+    fees_30d_usd: Optional[float] = None
+    hacks_count: int = 0
 
 
 class ProjectDetailResponse(BaseModel):
@@ -262,7 +266,7 @@ class ProjectDetailResponse(BaseModel):
     def _coerce_none_bool(cls, v):
         return False if v is None else bool(v)
 
-    @field_validator("chain_tvls", "score_breakdown", mode="before")
+    @field_validator("chain_tvls", "score_breakdown", "deep_metrics", mode="before")
     @classmethod
     def _coerce_none_dict(cls, v):
         return {} if v is None else v
@@ -277,6 +281,7 @@ class ProjectDetailResponse(BaseModel):
     verdict: str
     analysis_mode: str
     score_breakdown: Dict[str, int] = Field(default_factory=dict)
+    deep_metrics: Dict[str, Any] = Field(default_factory=dict)
     executive_summary: str
     bull_case: List[str] = Field(default_factory=list)
     red_flags: List[str] = Field(default_factory=list)

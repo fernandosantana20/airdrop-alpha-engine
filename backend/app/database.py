@@ -87,6 +87,7 @@ class Project(Base):
     verdict = Column(String(32), nullable=False, default="REJECTED", index=True)
     analysis_mode = Column(String(32), nullable=False, default="gemini")
     score_breakdown = Column(JSON, default=dict, nullable=False)
+    deep_metrics = Column(JSON, default=dict, nullable=False)
     executive_summary = Column(Text, nullable=False, default="")
     bull_case = Column(JSON, default=list, nullable=False)
     red_flags = Column(JSON, default=list, nullable=False)
@@ -185,6 +186,7 @@ def init_db() -> None:
             ("referral_url", "VARCHAR(500)"),
             ("user_referral_link", "VARCHAR(500)"),
             ("waitlist_notes", "TEXT DEFAULT ''"),
+            ("deep_metrics", json_type),
         ]
         with engine.begin() as conn:
             for col_name, col_type in migrations:
