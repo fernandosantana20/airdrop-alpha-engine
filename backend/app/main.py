@@ -490,6 +490,7 @@ async def check_project_updates(
     return await roadmap_monitor.check_project(db, project)
 
 
+@app.get("/api/monitor/run-all", response_model=List[MonitorCheckResponse])
 @app.post("/api/monitor/run-all", response_model=List[MonitorCheckResponse])
 async def run_all_monitors() -> List[MonitorCheckResponse]:
     return await roadmap_monitor.run_scheduled_check()

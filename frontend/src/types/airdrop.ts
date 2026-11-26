@@ -50,6 +50,17 @@ export interface TokenomicsData {
   slices: TokenomicsSlice[];
 }
 
+export interface AirdropEstimate {
+  expected_fdv_usd: number;
+  estimated_wallets: number;
+  conservative_usd: number;
+  base_usd: number;
+  optimistic_usd: number;
+  unlock_risk: "BAIXO" | "MÉDIO" | "ALTO" | string;
+  insider_allocation_pct: number;
+  tge_strategy: string;
+}
+
 export interface DeepMetrics {
   cost_model?: "FREE_TESTNET" | "CAPITAL_REQUIRED" | "HYBRID" | string;
   cost_model_label?: string;
@@ -61,6 +72,12 @@ export interface DeepMetrics {
   fees_30d_usd?: number | null;
   fees_all_time_usd?: number | null;
   mcap_usd?: number | null;
+  fdv_usd?: number | null;
+  current_price_usd?: number | null;
+  total_supply?: number | null;
+  circulating_supply?: number | null;
+  max_supply?: number | null;
+  float_pct?: number | null;
   token_symbol?: string | null;
   is_tokenless?: boolean;
   domain_created_at?: string | null;
@@ -79,6 +96,7 @@ export interface DeepMetrics {
   airdrop_platforms?: AirdropPlatformStatus[];
   ranked_platforms_count?: number;
   tokenomics?: TokenomicsData;
+  airdrop_estimate?: AirdropEstimate;
   provenance_checks?: ProvenanceCheck[];
 }
 

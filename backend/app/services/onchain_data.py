@@ -47,6 +47,12 @@ class OnChainMetrics:
     tvl_change_1d: Optional[float] = None
     tvl_change_7d: Optional[float] = None
     mcap_usd: Optional[float] = None
+    fdv_usd: Optional[float] = None
+    current_price_usd: Optional[float] = None
+    total_supply: Optional[float] = None
+    circulating_supply: Optional[float] = None
+    max_supply: Optional[float] = None
+    gecko_id: Optional[str] = None
     token_symbol: Optional[str] = None
     audits_count: int = 0
     audit_links: List[str] = field(default_factory=list)
@@ -121,6 +127,20 @@ class DefiLlamaClient:
             logger.debug("DefiLlama fees summary not available for %s: %s", slug, exc)
         return None
 
+    async def _fetch_coingecko_supply(self, gecko_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch live Total Supply, Circulating Supply, Max Supply, Price, and FDV from CoinGecko."""
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.get(
+                    f"https://api.coingecko.com/api/v3/coins/{gecko_id}"
+                    "?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false"
+                )
+                if resp.status_code == 200:
+                    return resp.json().get("market_data")
+        except Exception as exc:
+            logger.debug("CoinGecko supply fetch skipped for %s: %s", gecko_id, exc)
+        return None
+
     async def fetch_metrics(
         self, project_name: str, domain: str
     ) -> OnChainMetrics:
@@ -169,6 +189,8 @@ class DefiLlamaClient:
             metrics.tvl_change_7d = float(c7d) if c7d is not None else None
             mcap = matched_proto.get("mcap")
             metrics.mcap_usd = float(mcap) if mcap is not None else None
+            if matched_proto.get("gecko_id"):
+                metrics.gecko_id = str(matched_proto["gecko_id"])
             symbol = matched_proto.get("symbol")
             if symbol and symbol != "-":
                 metrics.token_symbol = str(symbol)
@@ -275,6 +297,8 @@ class DefiLlamaClient:
                         metrics.chains.insert(0, str(ch["name"]))
                     if not metrics.token_symbol and ch.get("tokenSymbol"):
                         metrics.token_symbol = str(ch["tokenSymbol"])
+                    if not metrics.gecko_id and ch.get("gecko_id"):
+                        metrics.gecko_id = str(ch["gecko_id"])
                     metrics.source_notes.append(
                         f"Matched DefiLlama Chain '{ch.get('name')}' (Chain TVL: ${ch_tvl_float or 0:,.0f})."
                     )
@@ -323,6 +347,26 @@ class DefiLlamaClient:
                             "technique": str(h.get("technique") or "Undisclosed"),
                         }
                     )
+
+        # 6. CoinGecko Total Supply, Circulating Supply, Price & FDV (free public API)
+        if metrics.gecko_id:
+            md = await self._fetch_coingecko_supply(metrics.gecko_id)
+            if isinstance(md, dict):
+                ts = md.get("total_supply")
+                cs = md.get("circulating_supply")
+                ms = md.get("max_supply")
+                metrics.total_supply = float(ts) if ts is not None else None
+                metrics.circulating_supply = float(cs) if cs is not None else None
+                metrics.max_supply = float(ms) if ms is not None else None
+                cp = (md.get("current_price") or {}).get("usd")
+                fdv = (md.get("fully_diluted_valuation") or {}).get("usd")
+                mc = (md.get("market_cap") or {}).get("usd")
+                if cp is not None:
+                    metrics.current_price_usd = float(cp)
+                if fdv is not None:
+                    metrics.fdv_usd = float(fdv)
+                if mc is not None and metrics.mcap_usd is None:
+                    metrics.mcap_usd = float(mc)
 
         return metrics
 

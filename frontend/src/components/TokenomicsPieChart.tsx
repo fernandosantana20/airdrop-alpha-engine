@@ -1,25 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import type { TokenomicsData } from "@/types/airdrop";
+import type { DeepMetrics } from "@/types/airdrop";
+import { formatUsd } from "@/lib/api";
 
 interface TokenomicsPieChartProps {
-  tokenomics?: TokenomicsData;
-  tokenSymbol?: string | null;
+  deepMetrics?: DeepMetrics;
 }
 
-export function TokenomicsPieChart({
-  tokenomics,
-  tokenSymbol,
-}: TokenomicsPieChartProps) {
+function formatSupply(value: number | null | undefined, symbol?: string | null): string {
+  if (value === null || value === undefined) return "Não divulgado";
+  let formatted = "";
+  if (value >= 1_000_000_000_000) formatted = `${(value / 1_000_000_000_000).toFixed(2)}T`;
+  else if (value >= 1_000_000_000) formatted = `${(value / 1_000_000_000).toFixed(2)}B`;
+  else if (value >= 1_000_000) formatted = `${(value / 1_000_000).toFixed(2)}M`;
+  else if (value >= 1_000) formatted = `${(value / 1_000).toFixed(1)}K`;
+  else formatted = value.toFixed(0);
+  return symbol ? `${formatted} ${symbol}` : formatted;
+}
+
+export function TokenomicsPieChart({ deepMetrics }: TokenomicsPieChartProps) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
+  const tokenomics = deepMetrics?.tokenomics;
+  const tokenSymbol = deepMetrics?.token_symbol;
   const slices = tokenomics?.slices || [];
   const total = slices.reduce((acc, s) => acc + s.percentage, 0) || 100;
   const activeSlice = slices.find((s) => s.key === activeKey) || null;
 
-  const size = 156;
-  const strokeWidth = 24;
+  const size = 152;
+  const strokeWidth = 22;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
@@ -30,7 +40,7 @@ export function TokenomicsPieChart({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
-            Distribuição de Tokenomics
+            Distribuição de Tokenomics &amp; Supply
           </h3>
           <p className="mt-0.5 text-[11px] text-fg-muted">
             {tokenomics?.source_label || "Alocação de supply"}
@@ -51,12 +61,49 @@ export function TokenomicsPieChart({
         </span>
       </div>
 
+      {/* Supply, Float & FDV Strip */}
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-border bg-canvas px-2.5 py-2">
+          <p className="text-[10px] text-fg-muted">Total Supply</p>
+          <p className="mt-0.5 truncate font-mono-code text-xs font-semibold text-fg">
+            {formatSupply(deepMetrics?.total_supply, tokenSymbol)}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-canvas px-2.5 py-2">
+          <p className="text-[10px] text-fg-muted">Circulante / Float</p>
+          <p className="mt-0.5 truncate font-mono-code text-xs font-semibold text-fg">
+            {deepMetrics?.circulating_supply != null
+              ? `${formatSupply(deepMetrics.circulating_supply)}${
+                  deepMetrics.float_pct != null ? ` (${deepMetrics.float_pct}%)` : ""
+                }`
+              : "Pré-TGE"}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-canvas px-2.5 py-2">
+          <p className="text-[10px] text-fg-muted">FDV / Preço</p>
+          <p className="mt-0.5 truncate font-mono-code text-xs font-semibold text-fg">
+            {deepMetrics?.fdv_usd != null
+              ? formatUsd(deepMetrics.fdv_usd)
+              : deepMetrics?.airdrop_estimate?.expected_fdv_usd
+              ? `~${formatUsd(deepMetrics.airdrop_estimate.expected_fdv_usd)}`
+              : "N/A"}
+          </p>
+          {deepMetrics?.current_price_usd != null && (
+            <p className="font-mono-code text-[10px] text-fg-muted">
+              ${deepMetrics.current_price_usd < 1
+                ? deepMetrics.current_price_usd.toFixed(4)
+                : deepMetrics.current_price_usd.toFixed(2)}
+            </p>
+          )}
+        </div>
+      </div>
+
       {slices.length === 0 ? (
         <p className="mt-4 text-xs text-fg-muted">
           Clique em reanalisar (↻) no topo para gerar o gráfico de tokenomics.
         </p>
       ) : (
-        <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row">
+        <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row">
           {/* Interactive SVG Donut / Pie Chart */}
           <div
             className="relative flex shrink-0 items-center justify-center"
@@ -101,7 +148,7 @@ export function TokenomicsPieChart({
             </svg>
 
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-3 text-center">
-              <span className="font-mono-code text-lg font-bold text-fg">
+              <span className="font-mono-code text-base font-bold text-fg">
                 {activeSlice ? `${activeSlice.percentage}%` : "100%"}
               </span>
               <span className="mt-0.5 line-clamp-2 text-[10px] leading-tight text-fg-muted">

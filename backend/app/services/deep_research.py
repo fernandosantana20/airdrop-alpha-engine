@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from app.services.airdrop_trackers import extract_tokenomics_distribution
+from app.services.airdrop_trackers import (
+    extract_supply_from_text,
+    extract_tokenomics_distribution,
+)
 from app.services.onchain_data import OnChainMetrics
 from app.services.scraper import ScrapedProjectData
 
@@ -419,10 +422,90 @@ def build_deep_metrics(
             f"{'histórico de hack/exploit registrado ou ' if hacks_count > 0 else ''}fundamentos insuficientes ou assimetria reduzida."
         )
 
+    tokenomics_text = f"{scraped.roadmap_text}\n{scraped.docs_text}\n{scraped.main_text}"
     tokenomics = extract_tokenomics_distribution(
-        f"{scraped.roadmap_text}\n{scraped.docs_text}\n{scraped.main_text}",
+        tokenomics_text,
         is_tokenless=is_tokenless,
     )
+    resolved_total_supply = onchain.total_supply or extract_supply_from_text(tokenomics_text)
+    circulating_supply = onchain.circulating_supply
+    float_pct = (
+        round((circulating_supply / resolved_total_supply) * 100, 1)
+        if circulating_supply and resolved_total_supply and resolved_total_supply > 0
+        else None
+    )
+
+    # Insider allocation & unlock pressure risk
+    slices = tokenomics.get("slices", [])
+    insider_pct = round(
+        sum(
+            float(s.get("percentage", 0))
+            for s in slices
+            if s.get("key") in ("investors", "team")
+        ),
+        1,
+    )
+    community_pct = round(
+        sum(
+            float(s.get("percentage", 0))
+            for s in slices
+            if s.get("key") == "community"
+        ),
+        1,
+    ) or 30.0
+
+    if (float_pct is not None and float_pct < 18.0) or insider_pct >= 42.0:
+        unlock_risk = "ALTO"
+        tge_strategy = "Low-float ou alta fatia de insiders: priorize realizar lucro parcial (50-75%) no TGE."
+    elif (float_pct is not None and float_pct < 35.0) or insider_pct >= 32.0:
+        unlock_risk = "MÉDIO"
+        tge_strategy = "Realize o custo/lucro inicial no TGE e mantenha parcela menor para staking/governança."
+    else:
+        unlock_risk = "BAIXO"
+        tge_strategy = "Distribuição comunitária saudável: boa margem para segurar parte ou farmar Season 2."
+
+    # Airdrop Payout Estimator per Wallet (Conservador / Base / Otimista)
+    if onchain.fdv_usd and onchain.fdv_usd > 0:
+        expected_fdv = onchain.fdv_usd
+    elif onchain.total_funding_usd and onchain.total_funding_usd > 0:
+        expected_fdv = max(80_000_000.0, onchain.total_funding_usd * 8.0)
+    elif onchain.tvl_usd and onchain.tvl_usd > 0:
+        expected_fdv = max(50_000_000.0, min(2_000_000_000.0, onchain.tvl_usd * 1.5))
+    else:
+        expected_fdv = 100_000_000.0
+
+    # Assume Season 1 initial drop distributes ~25% of the community bucket
+    initial_drop_pct = (community_pct * 0.25) / 100.0
+    airdrop_pool_usd = expected_fdv * initial_drop_pct
+
+    # Estimate eligible wallets based on TVL & Discord size
+    if tvl >= 500_000_000:
+        est_wallets = 180_000
+    elif tvl >= 100_000_000:
+        est_wallets = 65_000
+    elif tvl >= 10_000_000:
+        est_wallets = 22_000
+    elif d_members and d_members > 50_000:
+        est_wallets = 80_000
+    else:
+        est_wallets = 15_000
+
+    base_payout = round(airdrop_pool_usd / est_wallets, 0)
+    # Discount payout if token is already live
+    if not is_tokenless:
+        base_payout = round(base_payout * 0.35, 0)
+
+    airdrop_estimate = {
+        "expected_fdv_usd": round(expected_fdv, 2),
+        "estimated_wallets": est_wallets,
+        "conservative_usd": max(15, round(base_payout * 0.4)),
+        "base_usd": max(40, round(base_payout)),
+        "optimistic_usd": max(100, round(base_payout * 2.2)),
+        "unlock_risk": unlock_risk,
+        "insider_allocation_pct": insider_pct,
+        "tge_strategy": tge_strategy,
+    }
+
     platforms_list = airdrop_platforms or []
     ranked_platforms_count = sum(1 for p in platforms_list if p.get("listed") is True)
 
@@ -437,6 +520,12 @@ def build_deep_metrics(
         "fees_30d_usd": onchain.fees_30d_usd,
         "fees_all_time_usd": onchain.fees_all_time_usd,
         "mcap_usd": onchain.mcap_usd,
+        "fdv_usd": onchain.fdv_usd,
+        "current_price_usd": onchain.current_price_usd,
+        "total_supply": resolved_total_supply,
+        "circulating_supply": circulating_supply,
+        "max_supply": onchain.max_supply,
+        "float_pct": float_pct,
         "token_symbol": onchain.token_symbol,
         "is_tokenless": is_tokenless,
         "domain_created_at": scraped.domain_created_at,
@@ -455,5 +544,6 @@ def build_deep_metrics(
         "airdrop_platforms": platforms_list,
         "ranked_platforms_count": ranked_platforms_count,
         "tokenomics": tokenomics,
+        "airdrop_estimate": airdrop_estimate,
         "provenance_checks": checks,
     }

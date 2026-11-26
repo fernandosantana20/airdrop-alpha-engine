@@ -223,6 +223,30 @@ TOKENOMICS_BUCKETS = [
 ]
 
 
+def extract_supply_from_text(text: str) -> Optional[float]:
+    """Attempt to extract total/max supply from docs/site text for Pre-TGE tokens."""
+    pattern = re.compile(
+        r"(?:total\s+supply|max\s+supply|supply\s+total)[^0-9]{0,25}([\d,\.]+)\s*(billion|million|b\b|m\b)?",
+        re.IGNORECASE,
+    )
+    m = pattern.search(text)
+    if not m:
+        return None
+    raw_num = m.group(1).replace(",", "")
+    unit = (m.group(2) or "").lower()
+    try:
+        val = float(raw_num)
+        if unit in ("billion", "b"):
+            val *= 1_000_000_000
+        elif unit in ("million", "m"):
+            val *= 1_000_000
+        if val >= 100_000:
+            return val
+    except ValueError:
+        return None
+    return None
+
+
 def extract_tokenomics_distribution(
     text: str, is_tokenless: bool
 ) -> Dict[str, Any]:
