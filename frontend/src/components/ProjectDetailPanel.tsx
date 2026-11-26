@@ -36,6 +36,14 @@ interface ProjectDetailPanelProps {
     user_referral_link?: string;
     waitlist_url?: string;
   }) => Promise<void>;
+  onSaveTracker: (payload: {
+    capital_invested_usd: number;
+    gas_spent_usd: number;
+    time_spent_hours: number;
+    points_accumulated: string;
+    reward_received_usd: number;
+    investment_notes: string;
+  }) => Promise<void>;
   onToggleTask: (taskId: number, completed: boolean) => Promise<void>;
   onToggleMonitor: (enabled: boolean) => Promise<void>;
   onCheckUpdates: () => Promise<MonitorCheckResult | null>;
@@ -117,6 +125,7 @@ export function ProjectDetailPanel({
   onClose,
   onReanalyze,
   onSaveReferral,
+  onSaveTracker,
   onToggleTask,
   onToggleMonitor,
   onCheckUpdates,
@@ -129,6 +138,13 @@ export function ProjectDetailPanel({
   const [refInput, setRefInput] = useState(project.user_referral_link || "");
   const [waitlistInput, setWaitlistInput] = useState(project.waitlist_url || "");
   const [savingRef, setSavingRef] = useState(false);
+  const [capitalInput, setCapitalInput] = useState(String(project.capital_invested_usd || 0));
+  const [gasInput, setGasInput] = useState(String(project.gas_spent_usd || 0));
+  const [hoursInput, setHoursInput] = useState(String(project.time_spent_hours || 0));
+  const [pointsInput, setPointsInput] = useState(project.points_accumulated || "");
+  const [rewardInput, setRewardInput] = useState(String(project.reward_received_usd || 0));
+  const [notesInput, setNotesInput] = useState(project.investment_notes || "");
+  const [savingTracker, setSavingTracker] = useState(false);
   const [lastCheckMsg, setLastCheckMsg] = useState<string | null>(null);
   const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -137,7 +153,23 @@ export function ProjectDetailPanel({
   useEffect(() => {
     setRefInput(project.user_referral_link || "");
     setWaitlistInput(project.waitlist_url || "");
-  }, [project.id, project.user_referral_link, project.waitlist_url]);
+    setCapitalInput(String(project.capital_invested_usd || 0));
+    setGasInput(String(project.gas_spent_usd || 0));
+    setHoursInput(String(project.time_spent_hours || 0));
+    setPointsInput(project.points_accumulated || "");
+    setRewardInput(String(project.reward_received_usd || 0));
+    setNotesInput(project.investment_notes || "");
+  }, [
+    project.id,
+    project.user_referral_link,
+    project.waitlist_url,
+    project.capital_invested_usd,
+    project.gas_spent_usd,
+    project.time_spent_hours,
+    project.points_accumulated,
+    project.reward_received_usd,
+    project.investment_notes,
+  ]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -192,6 +224,30 @@ export function ProjectDetailPanel({
       setSavingRef(false);
     }
   };
+
+  const handleSaveTracker = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingTracker(true);
+    try {
+      await onSaveTracker({
+        capital_invested_usd: Math.max(0, parseFloat(capitalInput) || 0),
+        gas_spent_usd: Math.max(0, parseFloat(gasInput) || 0),
+        time_spent_hours: Math.max(0, parseFloat(hoursInput) || 0),
+        points_accumulated: pointsInput,
+        reward_received_usd: Math.max(0, parseFloat(rewardInput) || 0),
+        investment_notes: notesInput,
+      });
+    } finally {
+      setSavingTracker(false);
+    }
+  };
+
+  const netProfitUsd =
+    (parseFloat(rewardInput) || 0) - (parseFloat(gasInput) || 0);
+  const usdPerHour =
+    (parseFloat(hoursInput) || 0) > 0
+      ? netProfitUsd / (parseFloat(hoursInput) || 1)
+      : null;
 
   const handleCopyRef = async () => {
     const target = project.user_referral_link || refInput;
@@ -1024,6 +1080,119 @@ export function ProjectDetailPanel({
                     </button>
                   </div>
                 </div>
+              </form>
+            </section>
+
+            {/* Meu Controle — Dinheiro, Tempo, Pontos & ROI */}
+            <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                  Meu Controle · Capital, Tempo &amp; Pontos
+                </h3>
+                <span
+                  className={`font-mono-code text-xs font-semibold ${
+                    netProfitUsd > 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : netProfitUsd < 0
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-fg-muted"
+                  }`}
+                >
+                  Líquido: {netProfitUsd >= 0 ? "+" : "-"}$
+                  {Math.abs(netProfitUsd).toFixed(2)}
+                  {usdPerHour !== null && ` ($${usdPerHour.toFixed(1)}/h)`}
+                </span>
+              </div>
+
+              <form onSubmit={handleSaveTracker} className="mt-3 space-y-2.5">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] text-fg-muted">
+                      Capital alocado ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={capitalInput}
+                      onChange={(e) => setCapitalInput(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 font-mono-code text-base sm:text-xs text-fg focus:border-border-strong focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-fg-muted">
+                      Gas / Taxas ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={gasInput}
+                      onChange={(e) => setGasInput(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 font-mono-code text-base sm:text-xs text-fg focus:border-border-strong focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-fg-muted">
+                      Tempo investido (h)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={hoursInput}
+                      onChange={(e) => setHoursInput(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 font-mono-code text-base sm:text-xs text-fg focus:border-border-strong focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-fg-muted">
+                      Retorno recebido ($)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={rewardInput}
+                      onChange={(e) => setRewardInput(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 font-mono-code text-base sm:text-xs text-fg focus:border-border-strong focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-fg-muted">
+                    Pontos / XP / Tier acumulado
+                  </label>
+                  <input
+                    type="text"
+                    value={pointsInput}
+                    onChange={(e) => setPointsInput(e.target.value)}
+                    placeholder="ex: 14.500 XP · Season 2"
+                    className="mt-1 w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-fg-muted">
+                    Anotações (carteira, datas, estratégia)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={notesInput}
+                    onChange={(e) => setNotesInput(e.target.value)}
+                    placeholder="Ex: Wallet #2, LP ETH/USDC desde 10/11..."
+                    className="mt-1 w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={savingTracker}
+                  className="w-full rounded-lg bg-btn px-3 py-2 text-xs font-medium text-btn-fg transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingTracker ? "Salvando..." : "Salvar Controle"}
+                </button>
               </form>
             </section>
 

@@ -102,6 +102,14 @@ class Project(Base):
     waitlist_notes = Column(Text, nullable=False, default="")
     anti_sybil_strategy = Column(Text, nullable=False, default="")
 
+    # Personal investment, time, points & reward tracker
+    capital_invested_usd = Column(Float, default=0.0, nullable=False)
+    gas_spent_usd = Column(Float, default=0.0, nullable=False)
+    time_spent_hours = Column(Float, default=0.0, nullable=False)
+    points_accumulated = Column(String(120), default="", nullable=False)
+    reward_received_usd = Column(Float, default=0.0, nullable=False)
+    investment_notes = Column(Text, default="", nullable=False)
+
     # Monitoring state
     monitored_url = Column(String(500), nullable=True)
     monitoring_enabled = Column(Boolean, default=True, nullable=False)
@@ -187,6 +195,12 @@ def init_db() -> None:
             ("user_referral_link", "VARCHAR(500)"),
             ("waitlist_notes", "TEXT DEFAULT ''"),
             ("deep_metrics", json_type),
+            ("capital_invested_usd", "DOUBLE PRECISION DEFAULT 0" if not db_url.startswith("sqlite") else "REAL DEFAULT 0"),
+            ("gas_spent_usd", "DOUBLE PRECISION DEFAULT 0" if not db_url.startswith("sqlite") else "REAL DEFAULT 0"),
+            ("time_spent_hours", "DOUBLE PRECISION DEFAULT 0" if not db_url.startswith("sqlite") else "REAL DEFAULT 0"),
+            ("points_accumulated", "VARCHAR(120) DEFAULT ''"),
+            ("reward_received_usd", "DOUBLE PRECISION DEFAULT 0" if not db_url.startswith("sqlite") else "REAL DEFAULT 0"),
+            ("investment_notes", "TEXT DEFAULT ''"),
         ]
         with engine.begin() as conn:
             for col_name, col_type in migrations:

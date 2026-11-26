@@ -8,8 +8,9 @@ import type {
   ProjectDetail,
   ProjectListItem,
 } from "@/types/airdrop";
-import { api } from "@/lib/api";
+import { api, formatUsd } from "@/lib/api";
 import { AnalyzeForm } from "@/components/AnalyzeForm";
+import { DiscoverRadar } from "@/components/DiscoverRadar";
 import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectDetailPanel } from "@/components/ProjectDetailPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
 
+  const [activeView, setActiveView] = useState<"portfolio" | "discover">("portfolio");
   const [verdictFilter, setVerdictFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -112,6 +114,21 @@ export default function DashboardPage() {
     const updated = await api.updateReferral(selectedProject.id, payload);
     setSelectedProject(updated);
     setBanner({ type: "success", text: "Waitlist / Referral salvo com sucesso." });
+    await loadData();
+  };
+
+  const handleSaveTracker = async (payload: {
+    capital_invested_usd: number;
+    gas_spent_usd: number;
+    time_spent_hours: number;
+    points_accumulated: string;
+    reward_received_usd: number;
+    investment_notes: string;
+  }) => {
+    if (!selectedProject) return;
+    const updated = await api.updateTracker(selectedProject.id, payload);
+    setSelectedProject(updated);
+    setBanner({ type: "success", text: "Controle de capital, tempo e pontos salvo." });
     await loadData();
   };
 
@@ -264,32 +281,72 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-6xl px-3 pt-5 sm:px-6 sm:pt-6">
-        {/* Inline KPI Strip */}
-        <section className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-border pb-3 text-xs text-fg-muted">
-          <span>
-            Auditados{" "}
-            <strong className="ml-1 font-mono-code text-fg">
-              {stats?.total_projects ?? 0}
-            </strong>
-          </span>
-          <span>
-            Aprovados{" "}
-            <strong className="ml-1 font-mono-code text-emerald-600 dark:text-emerald-400">
-              {stats?.approved_projects ?? 0}
-            </strong>
-          </span>
-          <span>
-            Tasks{" "}
-            <strong className="ml-1 font-mono-code text-fg">
-              {stats?.completed_tasks ?? 0}/{stats?.total_tasks ?? 0}
-            </strong>
-          </span>
-          <span>
-            Updates{" "}
-            <strong className="ml-1 font-mono-code text-fg">
-              {stats?.roadmap_alerts ?? 0}
-            </strong>
-          </span>
+        {/* Top View Switch + Inline KPI Strip */}
+        <section className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="inline-flex self-start rounded-xl border border-border bg-surface p-1">
+            <button
+              onClick={() => setActiveView("portfolio")}
+              className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
+                activeView === "portfolio"
+                  ? "bg-btn text-btn-fg"
+                  : "text-fg-muted hover:text-fg"
+              }`}
+            >
+              Meus Projetos
+            </button>
+            <button
+              onClick={() => setActiveView("discover")}
+              className={`rounded-lg px-3 py-1 text-xs font-medium transition ${
+                activeView === "discover"
+                  ? "bg-btn text-btn-fg"
+                  : "text-fg-muted hover:text-fg"
+              }`}
+            >
+              Descobrir Alpha
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-fg-muted">
+            <span>
+              Auditados{" "}
+              <strong className="ml-1 font-mono-code text-fg">
+                {stats?.total_projects ?? 0}
+              </strong>
+            </span>
+            <span>
+              Aprovados{" "}
+              <strong className="ml-1 font-mono-code text-emerald-600 dark:text-emerald-400">
+                {stats?.approved_projects ?? 0}
+              </strong>
+            </span>
+            <span>
+              Capital{" "}
+              <strong className="ml-1 font-mono-code text-fg">
+                {formatUsd(stats?.total_capital_usd ?? 0)}
+              </strong>
+            </span>
+            <span>
+              Tempo{" "}
+              <strong className="ml-1 font-mono-code text-fg">
+                {(stats?.total_hours ?? 0).toFixed(1)}h
+              </strong>
+            </span>
+            <span>
+              Líquido{" "}
+              <strong
+                className={`ml-1 font-mono-code ${
+                  (stats?.net_roi_usd ?? 0) > 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : (stats?.net_roi_usd ?? 0) < 0
+                    ? "text-rose-600 dark:text-rose-400"
+                    : "text-fg"
+                }`}
+              >
+                {(stats?.net_roi_usd ?? 0) >= 0 ? "+" : "-"}$
+                {Math.abs(stats?.net_roi_usd ?? 0).toFixed(0)}
+              </strong>
+            </span>
+          </div>
         </section>
 
         {/* Banner */}
@@ -313,59 +370,72 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Analyze Input */}
-        <section className="mt-4">
-          <AnalyzeForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
-        </section>
-
-        {/* Filter Tabs (Horizontally Scrollable on Mobile) & Search */}
-        <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
-            {VERDICT_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setVerdictFilter(tab.id)}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                  verdictFilter === tab.id
-                    ? "border border-border bg-elevated text-fg"
-                    : "text-fg-muted hover:text-fg"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="relative w-full sm:w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar projeto ou rede..."
-              className="w-full rounded-lg border border-border bg-surface py-2 pl-8 pr-3 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+        {activeView === "discover" ? (
+          <div className="mt-4">
+            <DiscoverRadar
+              onAnalyzeUrl={async (url) => {
+                await handleAnalyze({ url, force_refresh: true });
+                setActiveView("portfolio");
+              }}
             />
           </div>
-        </section>
+        ) : (
+          <>
+            {/* Analyze Input */}
+            <section className="mt-4">
+              <AnalyzeForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
+            </section>
 
-        {/* Responsive Grid */}
-        <section className="mt-4">
-          {projects.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-fg-muted">
-              Nenhum projeto encontrado. Cole a URL de um protocolo acima para iniciar.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {projects.map((proj) => (
-                <ProjectCard
-                  key={proj.id}
-                  project={proj}
-                  onSelect={handleSelectProject}
+            {/* Filter Tabs (Horizontally Scrollable on Mobile) & Search */}
+            <section className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="no-scrollbar flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+                {VERDICT_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setVerdictFilter(tab.id)}
+                    className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                      verdictFilter === tab.id
+                        ? "border border-border bg-elevated text-fg"
+                        : "text-fg-muted hover:text-fg"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar projeto ou rede..."
+                  className="w-full rounded-lg border border-border bg-surface py-2 pl-8 pr-3 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
                 />
-              ))}
-            </div>
-          )}
-        </section>
+              </div>
+            </section>
+
+            {/* Responsive Grid */}
+            <section className="mt-4">
+              {projects.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-fg-muted">
+                  Nenhum projeto encontrado. Cole a URL de um protocolo acima ou abra &ldquo;Descobrir Alpha&rdquo;.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {projects.map((proj) => (
+                    <ProjectCard
+                      key={proj.id}
+                      project={proj}
+                      onSelect={handleSelectProject}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </main>
 
       {/* Full-Screen Project Detail View */}
@@ -375,6 +445,7 @@ export default function DashboardPage() {
           onClose={() => setSelectedProject(null)}
           onReanalyze={handleReanalyzeSelected}
           onSaveReferral={handleSaveReferral}
+          onSaveTracker={handleSaveTracker}
           onToggleTask={handleToggleTask}
           onToggleMonitor={handleToggleMonitor}
           onCheckUpdates={handleCheckUpdates}

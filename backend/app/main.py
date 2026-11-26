@@ -16,6 +16,7 @@ from app.database import AirdropTask, Project, RoadmapSnapshot, get_db, init_db
 from app.schemas import (
     AnalyzeProjectRequest,
     DashboardStatsResponse,
+    DiscoverProjectItem,
     HealthResponse,
     MonitorCheckResponse,
     MonitorToggleRequest,
@@ -24,6 +25,7 @@ from app.schemas import (
     TaskResponse,
     TaskToggleRequest,
     UpdateReferralRequest,
+    UpdateTrackerRequest,
 )
 from app.services.ai_analyzer import AIDueDiligenceAnalyzer
 from app.services.deep_research import build_deep_metrics
@@ -106,6 +108,11 @@ def get_dashboard_stats(db: Session = Depends(get_db)) -> DashboardStatsResponse
     tasks = db.query(AirdropTask).all()
     alerts_count = db.query(RoadmapSnapshot).count()
 
+    total_capital = sum(float(p.capital_invested_usd or 0.0) for p in projects)
+    total_gas = sum(float(p.gas_spent_usd or 0.0) for p in projects)
+    total_hours = sum(float(p.time_spent_hours or 0.0) for p in projects)
+    total_rewards = sum(float(p.reward_received_usd or 0.0) for p in projects)
+
     return DashboardStatsResponse(
         total_projects=len(projects),
         approved_projects=sum(1 for p in projects if p.verdict == "APPROVED"),
@@ -115,7 +122,41 @@ def get_dashboard_stats(db: Session = Depends(get_db)) -> DashboardStatsResponse
         completed_tasks=sum(1 for t in tasks if t.completed),
         monitored_projects=sum(1 for p in projects if p.monitoring_enabled),
         roadmap_alerts=alerts_count,
+        total_capital_usd=round(total_capital, 2),
+        total_gas_usd=round(total_gas, 2),
+        total_hours=round(total_hours, 2),
+        total_rewards_usd=round(total_rewards, 2),
+        net_roi_usd=round(total_rewards - total_gas, 2),
     )
+
+
+@app.get("/api/discover", response_model=List[DiscoverProjectItem])
+async def discover_projects(
+    min_tvl: float = Query(default=100_000, ge=0),
+    max_tvl: float = Query(default=150_000_000, ge=0),
+    chain: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
+    limit: int = Query(default=24, ge=1, le=60),
+    db: Session = Depends(get_db),
+) -> List[DiscoverProjectItem]:
+    defillama = DefiLlamaClient()
+    gems = await defillama.discover_tokenless_gems(
+        min_tvl=min_tvl,
+        max_tvl=max_tvl,
+        chain=chain,
+        search=search,
+        limit=limit,
+    )
+    existing_slugs = {
+        (p.slug or "").lower() for p in db.query(Project.slug).all() if p.slug
+    }
+    return [
+        DiscoverProjectItem(
+            **g,
+            already_analyzed=(g["slug"].lower() in existing_slugs),
+        )
+        for g in gems
+    ]
 
 
 @app.get("/api/projects", response_model=List[ProjectListItem])
@@ -173,6 +214,11 @@ def list_projects(
                 profitability_rating=(p.deep_metrics or {}).get("profitability_rating"),
                 fees_30d_usd=(p.deep_metrics or {}).get("fees_30d_usd"),
                 hacks_count=int((p.deep_metrics or {}).get("hacks_count") or 0),
+                capital_invested_usd=float(p.capital_invested_usd or 0.0),
+                gas_spent_usd=float(p.gas_spent_usd or 0.0),
+                time_spent_hours=float(p.time_spent_hours or 0.0),
+                points_accumulated=p.points_accumulated or "",
+                reward_received_usd=float(p.reward_received_usd or 0.0),
             )
         )
     return items
@@ -400,6 +446,26 @@ def update_project_referral(
         project.waitlist_url = cleaned_wl or None
         if cleaned_wl:
             project.has_waitlist = True
+    db.commit()
+    db.refresh(project)
+    return ProjectDetailResponse.model_validate(project)
+
+
+@app.patch("/api/projects/{project_id}/tracker", response_model=ProjectDetailResponse)
+def update_project_tracker(
+    project_id: int,
+    payload: UpdateTrackerRequest,
+    db: Session = Depends(get_db),
+) -> ProjectDetailResponse:
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    project.capital_invested_usd = payload.capital_invested_usd
+    project.gas_spent_usd = payload.gas_spent_usd
+    project.time_spent_hours = payload.time_spent_hours
+    project.points_accumulated = payload.points_accumulated.strip()
+    project.reward_received_usd = payload.reward_received_usd
+    project.investment_notes = payload.investment_notes.strip()
     db.commit()
     db.refresh(project)
     return ProjectDetailResponse.model_validate(project)

@@ -1,6 +1,7 @@
 import type {
   AirdropTask,
   DashboardStats,
+  DiscoverProjectItem,
   HealthStatus,
   MonitorCheckResult,
   ProjectDetail,
@@ -110,6 +111,39 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(payload),
     }),
+
+  updateTracker: (
+    projectId: number,
+    payload: {
+      capital_invested_usd: number;
+      gas_spent_usd: number;
+      time_spent_hours: number;
+      points_accumulated: string;
+      reward_received_usd: number;
+      investment_notes: string;
+    }
+  ) =>
+    request<ProjectDetail>(`/api/projects/${projectId}/tracker`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+
+  discover: (params?: {
+    chain?: string;
+    search?: string;
+    min_tvl?: number;
+    max_tvl?: number;
+    limit?: number;
+  }) => {
+    const qs = new URLSearchParams();
+    if (params?.chain && params.chain !== "ALL") qs.set("chain", params.chain);
+    if (params?.search?.trim()) qs.set("search", params.search.trim());
+    if (params?.min_tvl !== undefined) qs.set("min_tvl", String(params.min_tvl));
+    if (params?.max_tvl !== undefined) qs.set("max_tvl", String(params.max_tvl));
+    if (params?.limit !== undefined) qs.set("limit", String(params.limit));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<DiscoverProjectItem[]>(`/api/discover${suffix}`);
+  },
 
   checkProjectUpdates: (projectId: number) =>
     request<MonitorCheckResult>(`/api/projects/${projectId}/check-updates`, {

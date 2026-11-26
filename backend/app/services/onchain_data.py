@@ -325,3 +325,85 @@ class DefiLlamaClient:
                     )
 
         return metrics
+
+    async def discover_tokenless_gems(
+        self,
+        min_tvl: float = 100_000,
+        max_tvl: float = 150_000_000,
+        chain: Optional[str] = None,
+        search: Optional[str] = None,
+        limit: int = 24,
+    ) -> List[Dict[str, Any]]:
+        """Discover emerging, lesser-known, tokenless Web3 protocols from DefiLlama."""
+        protocols = await self._get_cached_json("protocols", DEFILLAMA_PROTOCOLS_URL)
+        if not isinstance(protocols, list):
+            return []
+
+        excluded_categories = {"CEX", "Chain", "Bridge"}
+        chain_needle = chain.strip().lower() if chain else ""
+        search_needle = search.strip().lower() if search else ""
+
+        candidates: List[Dict[str, Any]] = []
+        for p in protocols:
+            symbol = str(p.get("symbol") or "").strip()
+            # Tokenless filter: DefiLlama uses "-" or empty string for tokenless protocols
+            if symbol and symbol != "-":
+                continue
+
+            tvl = p.get("tvl")
+            if tvl is None:
+                continue
+            try:
+                tvl_f = float(tvl)
+            except (TypeError, ValueError):
+                continue
+
+            if tvl_f < min_tvl or tvl_f > max_tvl:
+                continue
+
+            category = str(p.get("category") or "DeFi")
+            if category in excluded_categories:
+                continue
+
+            url = str(p.get("url") or "").strip()
+            if not url.startswith("http"):
+                continue
+
+            chains = [str(c) for c in (p.get("chains") or [])]
+            if chain_needle and not any(chain_needle in c.lower() for c in chains):
+                continue
+
+            name = str(p.get("name") or "")
+            if search_needle and (
+                search_needle not in name.lower()
+                and search_needle not in category.lower()
+                and not any(search_needle in c.lower() for c in chains)
+            ):
+                continue
+
+            c7d = p.get("change_7d")
+            c7d_f = float(c7d) if isinstance(c7d, (int, float)) else None
+            twitter = p.get("twitter")
+
+            candidates.append(
+                {
+                    "name": name,
+                    "slug": str(p.get("slug") or ""),
+                    "url": url,
+                    "category": category,
+                    "chains": chains[:6],
+                    "tvl_usd": round(tvl_f, 2),
+                    "tvl_change_7d": round(c7d_f, 2) if c7d_f is not None else None,
+                    "twitter_url": f"https://x.com/{twitter}" if twitter else None,
+                }
+            )
+
+        # Rank emerging gems by positive 7d growth first, then TVL
+        candidates.sort(
+            key=lambda item: (
+                item["tvl_change_7d"] if item["tvl_change_7d"] is not None else -9999.0,
+                item["tvl_usd"],
+            ),
+            reverse=True,
+        )
+        return candidates[: max(1, min(limit, 60))]

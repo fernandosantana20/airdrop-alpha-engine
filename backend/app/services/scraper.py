@@ -58,6 +58,9 @@ class ScrapedProjectData:
     extracted_milestones: List[Dict[str, str]] = field(default_factory=list)
     domain_created_at: Optional[str] = None
     domain_age_days: Optional[int] = None
+    discord_members: Optional[int] = None
+    discord_online: Optional[int] = None
+    telegram_members: Optional[int] = None
     github_metrics: Optional[GitHubMetrics] = None
     monitored_url: str = ""
     content_hash: str = ""
@@ -413,6 +416,59 @@ class Web3Scraper:
             logger.debug("RDAP lookup skipped for %s: %s", root, exc)
         return None, None
 
+    async def fetch_discord_stats(
+        self, client: httpx.AsyncClient, discord_url: str
+    ) -> Tuple[Optional[int], Optional[int]]:
+        """Fetch public Discord server member & online counts from an invite URL."""
+        m = re.search(r"(?:discord\.gg/|discord\.com/invite/)([A-Za-z0-9-]+)", discord_url)
+        if not m:
+            return None, None
+        code = m.group(1)
+        try:
+            resp = await client.get(
+                f"https://discord.com/api/v9/invites/{code}?with_counts=true",
+                headers={"User-Agent": USER_AGENT},
+                timeout=8.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                total = data.get("approximate_member_count")
+                online = data.get("approximate_presence_count")
+                return (
+                    int(total) if total is not None else None,
+                    int(online) if online is not None else None,
+                )
+        except Exception as exc:
+            logger.debug("Discord invite stats failed for %s: %s", code, exc)
+        return None, None
+
+    async def fetch_telegram_stats(
+        self, client: httpx.AsyncClient, telegram_url: str
+    ) -> Optional[int]:
+        """Extract public Telegram channel/group member count from t.me preview."""
+        if not telegram_url or "+" in telegram_url or "/joinchat/" in telegram_url:
+            return None
+        try:
+            resp = await client.get(
+                telegram_url,
+                headers={"User-Agent": USER_AGENT},
+                follow_redirects=True,
+                timeout=8.0,
+            )
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, "html.parser")
+                extra = soup.find("div", class_="tgme_page_extra")
+                if extra:
+                    txt = extra.get_text(" ", strip=True)
+                    num_match = re.search(r"([\d\s,.]+)\s*(?:members|subscribers)", txt, re.IGNORECASE)
+                    if num_match:
+                        digits = re.sub(r"[^\d]", "", num_match.group(1))
+                        if digits:
+                            return int(digits)
+        except Exception as exc:
+            logger.debug("Telegram stats failed for %s: %s", telegram_url, exc)
+        return None
+
     async def fetch_github_metrics(
         self, client: httpx.AsyncClient, github_url: str
     ) -> Optional[GitHubMetrics]:
@@ -661,6 +717,16 @@ class Web3Scraper:
             result.domain_created_at, result.domain_age_days = (
                 await self.fetch_domain_provenance(client, domain)
             )
+
+            # Community engagement telemetry (Discord & Telegram public counts)
+            if result.discord_url:
+                result.discord_members, result.discord_online = (
+                    await self.fetch_discord_stats(client, result.discord_url)
+                )
+            if result.telegram_url:
+                result.telegram_members = await self.fetch_telegram_stats(
+                    client, result.telegram_url
+                )
 
         combined_for_signals = (
             f"{result.title}\n{result.meta_description}\n{result.roadmap_text[:4000]}\n"

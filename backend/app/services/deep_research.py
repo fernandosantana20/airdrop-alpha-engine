@@ -355,6 +355,51 @@ def build_deep_metrics(
             }
         )
 
+    # Check 8: Community Engagement (Discord / Telegram)
+    d_members = scraped.discord_members
+    d_online = scraped.discord_online
+    t_members = scraped.telegram_members
+    d_online_pct = (
+        round((d_online / d_members) * 100, 1)
+        if d_members and d_online and d_members > 0
+        else None
+    )
+    comm_parts: List[str] = []
+    if d_members:
+        comm_parts.append(
+            f"Discord: {d_members:,} membros"
+            + (f" ({d_online:,} online · {d_online_pct}%)" if d_online else "")
+        )
+    if t_members:
+        comm_parts.append(f"Telegram: {t_members:,} membros")
+
+    if (d_members and d_members >= 2000 and (d_online_pct is None or d_online_pct >= 2.0)) or (
+        t_members and t_members >= 2000
+    ):
+        checks.append(
+            {
+                "label": "Comunidade & Engajamento Real",
+                "status": "PASS",
+                "detail": " · ".join(comm_parts),
+            }
+        )
+    elif comm_parts:
+        checks.append(
+            {
+                "label": "Comunidade & Engajamento Real",
+                "status": "WARN",
+                "detail": " · ".join(comm_parts) + " (comunidade ainda inicial ou baixo % online).",
+            }
+        )
+    else:
+        checks.append(
+            {
+                "label": "Comunidade & Engajamento Real",
+                "status": "WARN",
+                "detail": "Métricas públicas de Discord/Telegram não disponíveis (verifique X/canais no anexo).",
+            }
+        )
+
     # 5. Asymmetry & Profitability Summary
     if profitability_rating == "ALTA":
         asymmetry_summary = (
@@ -394,5 +439,9 @@ def build_deep_metrics(
         "tier1_investors": tier1,
         "github_days_since_push": gh_days,
         "github_languages": gh_langs,
+        "discord_members": d_members,
+        "discord_online": d_online,
+        "discord_online_pct": d_online_pct,
+        "telegram_members": t_members,
         "provenance_checks": checks,
     }

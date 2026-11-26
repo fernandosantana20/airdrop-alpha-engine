@@ -157,6 +157,27 @@ class UpdateReferralRequest(BaseModel):
     waitlist_url: Optional[str] = None
 
 
+class UpdateTrackerRequest(BaseModel):
+    capital_invested_usd: float = Field(default=0.0, ge=0.0)
+    gas_spent_usd: float = Field(default=0.0, ge=0.0)
+    time_spent_hours: float = Field(default=0.0, ge=0.0)
+    points_accumulated: str = Field(default="", max_length=120)
+    reward_received_usd: float = Field(default=0.0, ge=0.0)
+    investment_notes: str = Field(default="", max_length=2000)
+
+
+class DiscoverProjectItem(BaseModel):
+    name: str
+    slug: str
+    url: str
+    category: str
+    chains: List[str] = Field(default_factory=list)
+    tvl_usd: float
+    tvl_change_7d: Optional[float] = None
+    twitter_url: Optional[str] = None
+    already_analyzed: bool = False
+
+
 # ---------------------------------------------------------------------------
 # API Response Schemas
 # ---------------------------------------------------------------------------
@@ -231,6 +252,11 @@ class ProjectListItem(BaseModel):
     profitability_rating: Optional[str] = None
     fees_30d_usd: Optional[float] = None
     hacks_count: int = 0
+    capital_invested_usd: float = 0.0
+    gas_spent_usd: float = 0.0
+    time_spent_hours: float = 0.0
+    points_accumulated: str = ""
+    reward_received_usd: float = 0.0
 
 
 class ProjectDetailResponse(BaseModel):
@@ -256,10 +282,15 @@ class ProjectDetailResponse(BaseModel):
     def _coerce_none_list(cls, v):
         return [] if v is None else v
 
-    @field_validator("waitlist_notes", mode="before")
+    @field_validator("waitlist_notes", "points_accumulated", "investment_notes", mode="before")
     @classmethod
     def _coerce_none_str(cls, v):
-        return "" if v is None else v
+        return "" if v is None else str(v)
+
+    @field_validator("capital_invested_usd", "gas_spent_usd", "time_spent_hours", "reward_received_usd", mode="before")
+    @classmethod
+    def _coerce_none_float(cls, v):
+        return 0.0 if v is None else float(v)
 
     @field_validator("has_waitlist", "has_referral", mode="before")
     @classmethod
@@ -295,6 +326,12 @@ class ProjectDetailResponse(BaseModel):
     user_referral_link: Optional[str] = None
     waitlist_notes: str = ""
     anti_sybil_strategy: str
+    capital_invested_usd: float = 0.0
+    gas_spent_usd: float = 0.0
+    time_spent_hours: float = 0.0
+    points_accumulated: str = ""
+    reward_received_usd: float = 0.0
+    investment_notes: str = ""
     monitored_url: Optional[str] = None
     monitoring_enabled: bool
     last_content_hash: Optional[str] = None
@@ -314,6 +351,11 @@ class DashboardStatsResponse(BaseModel):
     completed_tasks: int
     monitored_projects: int
     roadmap_alerts: int
+    total_capital_usd: float = 0.0
+    total_gas_usd: float = 0.0
+    total_hours: float = 0.0
+    total_rewards_usd: float = 0.0
+    net_roi_usd: float = 0.0
 
 
 class MonitorCheckResponse(BaseModel):

@@ -49,7 +49,23 @@ export interface DeepMetrics {
   tier1_investors?: string[];
   github_days_since_push?: number | null;
   github_languages?: string[];
+  discord_members?: number | null;
+  discord_online?: number | null;
+  discord_online_pct?: number | null;
+  telegram_members?: number | null;
   provenance_checks?: ProvenanceCheck[];
+}
+
+export interface DiscoverProjectItem {
+  name: string;
+  slug: string;
+  url: string;
+  category: string;
+  chains: string[];
+  tvl_usd: number;
+  tvl_change_7d: number | null;
+  twitter_url: string | null;
+  already_analyzed: boolean;
 }
 
 export interface ScoreBreakdown {
@@ -118,6 +134,11 @@ export interface ProjectListItem {
   profitability_rating?: string | null;
   fees_30d_usd?: number | null;
   hacks_count?: number;
+  capital_invested_usd?: number;
+  gas_spent_usd?: number;
+  time_spent_hours?: number;
+  points_accumulated?: string;
+  reward_received_usd?: number;
 }
 
 export interface ProjectDetail {
@@ -160,6 +181,12 @@ export interface ProjectDetail {
   user_referral_link: string | null;
   waitlist_notes: string;
   anti_sybil_strategy: string;
+  capital_invested_usd: number;
+  gas_spent_usd: number;
+  time_spent_hours: number;
+  points_accumulated: string;
+  reward_received_usd: number;
+  investment_notes: string;
   monitored_url: string | null;
   monitoring_enabled: boolean;
   last_content_hash: string | null;
@@ -179,6 +206,11 @@ export interface DashboardStats {
   completed_tasks: number;
   monitored_projects: number;
   roadmap_alerts: number;
+  total_capital_usd?: number;
+  total_gas_usd?: number;
+  total_hours?: number;
+  total_rewards_usd?: number;
+  net_roi_usd?: number;
 }
 
 export interface HealthStatus {
