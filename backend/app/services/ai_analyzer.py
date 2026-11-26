@@ -147,23 +147,56 @@ Notes: {' | '.join(onchain.source_notes)}
             report.strategic_tasks = []
         return report
 
+    def _discover_available_models(self, client) -> List[str]:
+        """Dynamically list models enabled for this API key that support generateContent."""
+        found: List[str] = []
+        try:
+            for m in client.models.list():
+                name = getattr(m, "name", "") or ""
+                short = name.replace("models/", "")
+                actions = getattr(m, "supported_actions", None) or []
+                if "gemini" not in short.lower():
+                    continue
+                if any(bad in short.lower() for bad in ("embedding", "imagen", "veo", "tts", "audio", "robotics", "computer-use")):
+                    continue
+                if actions and "generateContent" not in actions:
+                    continue
+                found.append(short)
+        except Exception as exc:
+            logger.warning("Could not list Gemini models: %s", exc)
+
+        # Prefer newest flash models first, then pro
+        def _rank(name: str) -> tuple[int, str]:
+            low = name.lower()
+            if "flash" in low and "lite" not in low:
+                return (0, name)
+            if "flash" in low:
+                return (1, name)
+            if "pro" in low:
+                return (2, name)
+            return (3, name)
+
+        # Sort by preference, newest version first within same tier
+        found.sort(key=lambda n: (_rank(n)[0], n), reverse=False)
+        return found
+
     def _run_gemini_sync(self, prompt_context: str) -> DueDiligenceReport:
         from google import genai
         from google.genai import types
 
         client = genai.Client(api_key=self.settings.gemini_api_key)
+        discovered = self._discover_available_models(client)
         candidate_models = list(
             dict.fromkeys(
-                [
+                discovered[:6]
+                + [
                     self.settings.gemini_model,
-                    "gemini-flash-latest",
                     "gemini-3-flash-preview",
-                    "gemini-2.5-flash-lite",
-                    "gemini-2.5-pro",
-                    "gemini-pro-latest",
+                    "gemini-2.5-flash",
                 ]
             )
         )
+        logger.info("Gemini candidate models: %s", candidate_models)
 
         last_exc: Exception | None = None
         response = None
@@ -179,17 +212,20 @@ Notes: {' | '.join(onchain.source_notes)}
                         temperature=0.2,
                     ),
                 )
+                logger.info("Gemini analysis succeeded with model: %s", model_name)
                 break
             except Exception as exc:
                 last_exc = exc
                 err_str = str(exc)
                 if "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str:
-                    logger.warning("Gemini model %s unavailable, trying next candidate...", model_name)
+                    logger.warning("Gemini model %s unavailable, trying next...", model_name)
                     continue
                 raise
 
         if response is None:
-            raise last_exc or RuntimeError("No available Gemini model succeeded.")
+            raise last_exc or RuntimeError(
+                f"No available Gemini model succeeded (tried: {', '.join(candidate_models[:5])})."
+            )
 
         if getattr(response, "parsed", None) is not None:
             parsed = response.parsed
