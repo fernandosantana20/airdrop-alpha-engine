@@ -167,7 +167,7 @@ class UpdateTrackerRequest(BaseModel):
 
 
 class WalletCheckRequest(BaseModel):
-    address: str = Field(..., min_length=42, max_length=42)
+    address: str = Field(..., min_length=32, max_length=64)
 
 
 class DiscoverProjectItem(BaseModel):

@@ -45,7 +45,7 @@ export function WalletCheckerModal({ onClose }: WalletCheckerModalProps) {
                 Saúde Anti-Sybil da Carteira (Somente Leitura)
               </h2>
               <p className="text-[11px] text-fg-muted">
-                Verifica atividade real em 6 redes EVM via RPC público — nunca pede assinatura nem chave privada.
+                Suporta endereços EVM (8 redes de airdrop) e Solana via RPC público — sem conectar carteira nem pedir assinatura.
               </p>
             </div>
           </div>
@@ -63,7 +63,7 @@ export function WalletCheckerModal({ onClose }: WalletCheckerModalProps) {
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="Cole seu endereço público EVM (0x...)"
+            placeholder="Cole seu endereço público EVM (0x...) ou Solana"
             className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 font-mono-code text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
             required
           />
@@ -118,19 +118,26 @@ export function WalletCheckerModal({ onClose }: WalletCheckerModalProps) {
 
               <div className="flex items-center gap-4 text-xs">
                 <div>
-                  <p className="text-[10px] text-fg-muted">Total Txs</p>
+                  <p className="text-[10px] text-fg-muted">
+                    {result.wallet_type === "SOLANA" ? "Txs (recentes)" : "Total Txs"}
+                  </p>
                   <p className="font-mono-code font-semibold text-fg">
                     {result.total_transactions}
+                    {result.wallet_type === "SOLANA" && result.total_transactions === 100
+                      ? "+"
+                      : ""}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] text-fg-muted">Redes Ativas</p>
                   <p className="font-mono-code font-semibold text-fg">
-                    {result.active_chains_count}/6
+                    {result.active_chains_count}/{result.total_chains_checked || result.chains.length}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-fg-muted">Saldo ETH</p>
+                  <p className="text-[10px] text-fg-muted">
+                    Saldo {result.native_symbol || "ETH"}
+                  </p>
                   <p className="font-mono-code font-semibold text-fg">
                     {result.total_eth_balance.toFixed(4)}
                   </p>
@@ -138,23 +145,25 @@ export function WalletCheckerModal({ onClose }: WalletCheckerModalProps) {
               </div>
             </div>
 
-            {/* 6 Chains Grid */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {/* Chains Grid */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {result.chains.map((ch) => (
                 <div
                   key={ch.chain}
                   className="rounded-xl border border-border bg-surface px-3 py-2.5 text-xs"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-fg">{ch.chain}</span>
+                    <span className="truncate font-medium text-fg">{ch.chain}</span>
                     <span
-                      className={`h-1.5 w-1.5 rounded-full ${
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                         ch.active ? "bg-emerald-500 dark:bg-emerald-400" : "bg-fg-muted/40"
                       }`}
                     />
                   </div>
                   <p className="mt-1 font-mono-code text-[11px] text-fg-secondary">
-                    {ch.tx_count} txs · {ch.balance} {ch.symbol}
+                    {ch.symbol === "SPL"
+                      ? `${ch.tx_count} tokens`
+                      : `${ch.tx_count} txs · ${ch.balance} ${ch.symbol}`}
                   </p>
                 </div>
               ))}

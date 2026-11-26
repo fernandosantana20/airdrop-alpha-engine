@@ -57,10 +57,13 @@ export interface WalletChainStat {
 
 export interface WalletCheckResult {
   address: string;
+  wallet_type?: "EVM" | "SOLANA" | string;
+  native_symbol?: string;
   sybil_score: number;
   verdict: string;
   total_transactions: number;
   active_chains_count: number;
+  total_chains_checked?: number;
   total_eth_balance: number;
   chains: WalletChainStat[];
   checks: ProvenanceCheck[];
