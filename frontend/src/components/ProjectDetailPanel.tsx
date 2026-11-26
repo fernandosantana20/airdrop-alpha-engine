@@ -813,18 +813,23 @@ export function ProjectDetailPanel({
               </div>
             </section>
 
-            {/* Roadmap do Projeto */}
+            {/* Roadmap do Projeto — Mapa Completo do Caminho */}
             <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
-                  Roadmap do Projeto
-                </h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                    Roadmap Completo do Projeto
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-fg-muted">
+                    Concluído → Etapa Atual → Próximos Passos até o Airdrop / TGE
+                  </p>
+                </div>
                 {project.roadmap_url && (
                   <a
                     href={project.roadmap_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-fg-secondary hover:text-fg"
+                    className="inline-flex items-center gap-1 rounded-lg border border-border bg-canvas px-2.5 py-1 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
                   >
                     Fonte oficial
                     <ExternalLink className="h-3 w-3" />
@@ -832,50 +837,97 @@ export function ProjectDetailPanel({
                 )}
               </div>
 
-              <p className="mt-2 text-xs text-fg-secondary">{project.roadmap_summary}</p>
-
               {project.roadmap_milestones && project.roadmap_milestones.length > 0 ? (
-                <div className="mt-4 space-y-3 border-l border-border pl-4">
-                  {project.roadmap_milestones.map((m, idx) => {
-                    const statusDot =
-                      m.status === "DONE"
-                        ? "bg-emerald-500 dark:bg-emerald-400"
-                        : m.status === "IN_PROGRESS"
-                        ? "bg-amber-500 dark:bg-amber-400"
-                        : "bg-fg-muted";
-                    const statusLabel =
-                      m.status === "DONE"
-                        ? "Concluído"
-                        : m.status === "IN_PROGRESS"
-                        ? "Em andamento"
-                        : "Próximo";
+                <>
+                  {(() => {
+                    const totalM = project.roadmap_milestones.length;
+                    const doneM = project.roadmap_milestones.filter((m) => m.status === "DONE").length;
+                    const activeM = project.roadmap_milestones.filter((m) => m.status === "IN_PROGRESS").length;
+                    const upcomingM = totalM - doneM - activeM;
+                    const progressPct = Math.round(((doneM + activeM * 0.5) / totalM) * 100);
                     return (
-                      <div
-                        key={idx}
-                        className="relative rounded-xl border border-border bg-canvas p-3"
-                      >
-                        <span
-                          className={`absolute -left-[21px] top-4 h-2.5 w-2.5 rounded-full ring-4 ring-surface ${statusDot}`}
-                        />
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="font-mono-code text-[11px] font-semibold text-fg-muted">
-                            {m.phase}
-                          </span>
-                          <span className="text-[10px] font-medium text-fg-muted">
-                            {statusLabel}
+                      <div className="mt-3.5 rounded-xl border border-border bg-canvas p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                              ✓ {doneM} concluída(s)
+                            </span>
+                            <span className="text-amber-600 dark:text-amber-400 font-medium">
+                              ● {activeM} atual(is)
+                            </span>
+                            <span className="text-fg-muted">
+                              ○ {upcomingM} próxima(s)
+                            </span>
+                          </div>
+                          <span className="font-mono-code font-semibold text-fg">
+                            {progressPct}% do ciclo
                           </span>
                         </div>
-                        <h4 className="mt-1 text-xs font-semibold text-fg">{m.title}</h4>
-                        {m.details && (
-                          <p className="mt-1 text-xs text-fg-secondary">{m.details}</p>
-                        )}
+                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-track">
+                          <div
+                            className="h-full rounded-full bg-emerald-600 dark:bg-emerald-400 transition-all"
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        </div>
                       </div>
                     );
-                  })}
-                </div>
+                  })()}
+
+                  <div className="mt-4 space-y-2.5 border-l-2 border-border pl-4">
+                    {project.roadmap_milestones.map((m, idx) => {
+                      const isDone = m.status === "DONE";
+                      const isCurrent = m.status === "IN_PROGRESS";
+                      const statusDot = isDone
+                        ? "bg-emerald-500 dark:bg-emerald-400"
+                        : isCurrent
+                        ? "bg-amber-500 dark:bg-amber-400"
+                        : "bg-fg-muted";
+                      const badgeClass = isDone
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                        : isCurrent
+                        ? "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                        : "bg-elevated text-fg-muted";
+                      const statusLabel = isDone
+                        ? "Concluído"
+                        : isCurrent
+                        ? "Atual · Agora"
+                        : "Próximo";
+                      return (
+                        <div
+                          key={idx}
+                          className={`relative rounded-xl border p-3.5 transition ${
+                            isCurrent
+                              ? "border-amber-500/40 bg-amber-500/5"
+                              : "border-border bg-canvas"
+                          }`}
+                        >
+                          <span
+                            className={`absolute -left-[22px] top-4 h-3 w-3 rounded-full ring-4 ring-surface ${statusDot}`}
+                          />
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-mono-code text-[11px] font-semibold text-fg-muted">
+                              {m.phase}
+                            </span>
+                            <span
+                              className={`rounded px-2 py-0.5 text-[10px] font-semibold ${badgeClass}`}
+                            >
+                              {statusLabel}
+                            </span>
+                          </div>
+                          <h4 className="mt-1 text-xs font-semibold text-fg">{m.title}</h4>
+                          {m.details && (
+                            <p className="mt-1 text-xs leading-relaxed text-fg-secondary">
+                              {m.details}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               ) : (
                 <p className="mt-3 text-xs text-fg-muted">
-                  Clique em reanalisar (↻) no topo para extrair as fases do roadmap.
+                  Clique em reanalisar (↻) no topo para gerar o mapa completo do roadmap.
                 </p>
               )}
             </section>

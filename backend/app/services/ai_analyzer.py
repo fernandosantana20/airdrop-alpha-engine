@@ -358,74 +358,180 @@ Notes: {' | '.join(onchain.source_notes)}
                 ),
             ]
 
-        # Build structured roadmap milestones from scraped text or live protocol lifecycle signals
+        # Build a complete, chronological, end-to-end project roadmap map
+        # (Past / DONE -> Current / IN_PROGRESS -> Future / UPCOMING) + any specific doc milestones
         milestones: List[RoadmapMilestone] = []
-        if scraped.extracted_milestones:
-            for m in scraped.extracted_milestones[:6]:
-                milestones.append(
-                    RoadmapMilestone(
-                        phase=m["phase"],
-                        title=m["title"],
-                        status=m["status"] if m["status"] in {"DONE", "IN_PROGRESS", "UPCOMING"} else "UPCOMING",
-                        details=m.get("details", ""),
-                    )
-                )
-        else:
-            if onchain.funding_rounds or onchain.investors:
-                milestones.append(
-                    RoadmapMilestone(
-                        phase="Fase 1 · Backing",
-                        title="Captação & Investidores Institucionais",
-                        status="DONE",
-                        details=f"Backers identificados: {', '.join(onchain.investors[:5]) or 'Rodada registrada no DefiLlama'}.",
-                    )
-                )
-            if onchain.audits_count > 0 or onchain.audit_links:
-                milestones.append(
-                    RoadmapMilestone(
-                        phase="Fase 2 · Segurança",
-                        title="Auditorias de Contratos Inteligentes",
-                        status="DONE",
-                        details=f"{max(onchain.audits_count, len(onchain.audit_links))} auditoria(s) verificada(s).",
-                    )
-                )
-            if onchain.tvl_usd and onchain.tvl_usd > 0:
-                milestones.append(
-                    RoadmapMilestone(
-                        phase="Fase 3 · Mainnet",
-                        title="Protocolo em Produção com TVL Ativo",
-                        status="IN_PROGRESS",
-                        details=f"TVL atual de ${onchain.tvl_usd:,.0f} em {', '.join(onchain.chains[:4]) or 'rede principal'}.",
-                    )
-                )
-            else:
-                milestones.append(
-                    RoadmapMilestone(
-                        phase="Fase 3 · Early Access",
-                        title="Testnet / Waitlist & Onboarding Inicial",
-                        status="IN_PROGRESS",
-                        details="Projeto pré-TVL ou em fase inicial de testes/waitlist.",
-                    )
-                )
-            if scraped.has_waitlist or scraped.has_referral:
-                milestones.append(
-                    RoadmapMilestone(
-                        phase="Fase 4 · Crescimento",
-                        title="Campanha de Waitlist / Pontos / Referral",
-                        status="IN_PROGRESS",
-                        details=scraped.waitlist_notes,
-                    )
-                )
+
+        # 1. DONE: Foundation & Provenance
+        domain_detail = (
+            f"Domínio oficial registrado em {scraped.domain_created_at} ({scraped.domain_age_days} dias de histórico)."
+            if scraped.domain_created_at
+            else f"Site oficial ({scraped.domain}) e canais de comunidade publicados."
+        )
+        channels_active = [
+            lbl
+            for lbl, val in (
+                ("Docs", scraped.docs_url),
+                ("GitHub", scraped.github_url or onchain.defillama_github),
+                ("X", scraped.twitter_url or onchain.defillama_twitter),
+                ("Discord", scraped.discord_url),
+                ("Telegram", scraped.telegram_url),
+            )
+            if val
+        ]
+        milestones.append(
+            RoadmapMilestone(
+                phase="Etapa 1 · Fundação",
+                title="Estruturação, Site & Documentação Pública",
+                status="DONE",
+                details=f"{domain_detail} Canais ativos: {', '.join(channels_active) or 'Site oficial'}.",
+            )
+        )
+
+        # 2. DONE (or UPCOMING): Backing & Venture Capital
+        if onchain.funding_rounds or onchain.investors or onchain.total_funding_usd:
+            funding_str = (
+                f"${onchain.total_funding_usd / 1_000_000:.2f}M captados"
+                if onchain.total_funding_usd
+                else "Rodada registrada no DefiLlama"
+            )
+            inv_str = ", ".join(onchain.investors[:5]) if onchain.investors else "investidores não divulgados"
             milestones.append(
                 RoadmapMilestone(
-                    phase="Fase 5 · Token / TGE",
-                    title="Token Generation Event (TGE) & Airdrop" if not onchain.token_symbol else f"Expansão Pós-TGE ({onchain.token_symbol})",
-                    status="UPCOMING" if not onchain.token_symbol else "DONE",
-                    details=(
-                        "Token ainda não listado — monitorando docs/roadmap para anúncio de snapshot e TGE."
-                        if not onchain.token_symbol
-                        else f"Token {onchain.token_symbol} já ativo; acompanhar novas temporadas de incentivos."
-                    ),
+                    phase="Etapa 2 · Backing",
+                    title="Captação & Investidores Institucionais",
+                    status="DONE",
+                    details=f"{funding_str}. Backers confirmados: {inv_str}.",
+                )
+            )
+        else:
+            milestones.append(
+                RoadmapMilestone(
+                    phase="Etapa 2 · Backing",
+                    title="Captação / Grants / Bootstrapping",
+                    status="IN_PROGRESS",
+                    details="Nenhuma rodada pública de VC indexada ainda (projeto bootstrapped ou rodada ainda não divulgada).",
+                )
+            )
+
+        # 3. DONE / IN_PROGRESS: Engineering & Smart Contract Audits
+        audits_n = max(onchain.audits_count, len(onchain.audit_links))
+        gh_note = (
+            f"GitHub ativo ({scraped.github_metrics.stars or 0}★, {scraped.github_metrics.repos_count or 1} repo(s))"
+            if scraped.github_metrics
+            else ("GitHub vinculado" if (scraped.github_url or onchain.defillama_github) else "Código-fonte fechado/privado")
+        )
+        milestones.append(
+            RoadmapMilestone(
+                phase="Etapa 3 · Engenharia & Segurança",
+                title="Desenvolvimento On-Chain & Auditorias",
+                status="DONE" if audits_n > 0 else "IN_PROGRESS",
+                details=(
+                    f"{gh_note}. {audits_n} auditoria(s) de smart contracts verificada(s) no DefiLlama."
+                    if audits_n > 0
+                    else f"{gh_note}. Aguardando publicação formal de auditorias de segurança."
+                ),
+            )
+        )
+
+        # 4. CURRENT (IN_PROGRESS): Product Live (Mainnet TVL vs Testnet/Early Access)
+        if onchain.tvl_usd and onchain.tvl_usd > 0:
+            chains_str = ", ".join(onchain.chains[:4]) or "rede principal"
+            fees_str = (
+                f" Receita 30d: ${onchain.fees_30d_usd:,.0f}."
+                if onchain.fees_30d_usd
+                else ""
+            )
+            milestones.append(
+                RoadmapMilestone(
+                    phase="Etapa 4 · Operação Atual",
+                    title="Mainnet Ativa & Tração de Liquidez (TVL)",
+                    status="IN_PROGRESS",
+                    details=f"Protocolo em produção com ${onchain.tvl_usd:,.0f} de TVL em {chains_str}.{fees_str}",
+                )
+            )
+        else:
+            milestones.append(
+                RoadmapMilestone(
+                    phase="Etapa 4 · Operação Atual",
+                    title="Testnet / Beta Fechado & Validação Inicial",
+                    status="IN_PROGRESS",
+                    details="Protocolo em estágio pré-TVL/testnet — foco em testes gratuitos, faucets e feedback inicial.",
+                )
+            )
+
+        # 5. CURRENT (IN_PROGRESS): Community, Points, Waitlist & Referral Growth
+        growth_bits: List[str] = []
+        if scraped.has_waitlist:
+            growth_bits.append("Waitlist / Early Access ativa")
+        if scraped.has_referral:
+            growth_bits.append("Programa de Referral/Pontos ativo")
+        if scraped.discord_members:
+            growth_bits.append(f"Discord com {scraped.discord_members:,} membros")
+        if scraped.telegram_members:
+            growth_bits.append(f"Telegram com {scraped.telegram_members:,} membros")
+        milestones.append(
+            RoadmapMilestone(
+                phase="Etapa 5 · Crescimento & Incentivos",
+                title="Campanha de Pontos, Referral & Comunidade",
+                status="IN_PROGRESS",
+                details=(
+                    " · ".join(growth_bits) + "."
+                    if growth_bits
+                    else "Fase de construção de comunidade, campanhas sociais e aquisição orgânica de usuários."
+                ),
+            )
+        )
+
+        # Append up to 2 concrete version/quarter milestones extracted directly from official docs
+        added_doc_titles: set[str] = set()
+        for m in scraped.extracted_milestones:
+            clean_t = m.get("title", "").strip()
+            if len(clean_t) < 10 or clean_t.lower() in added_doc_titles:
+                continue
+            added_doc_titles.add(clean_t.lower())
+            milestones.append(
+                RoadmapMilestone(
+                    phase=f"Docs · {m['phase']}",
+                    title=clean_t,
+                    status=m["status"] if m["status"] in {"DONE", "IN_PROGRESS", "UPCOMING"} else "UPCOMING",
+                    details=m.get("details", ""),
+                )
+            )
+            if len(added_doc_titles) >= 2:
+                break
+
+        # 6. UPCOMING: Snapshot & Anti-Sybil Qualification Window
+        milestones.append(
+            RoadmapMilestone(
+                phase="Etapa 6 · Qualificação",
+                title="Snapshot On-Chain & Filtro Anti-Sybil",
+                status="UPCOMING" if not onchain.token_symbol else "IN_PROGRESS",
+                details=(
+                    "Janela crítica para acumular meses ativos, volume orgânico, liquidez contínua (>14 dias) e evitar padrões de bot antes do snapshot."
+                    if not onchain.token_symbol
+                    else "Acompanhar snapshots de novas Seasons/incentivos recorrentes para usuários ativos."
+                ),
+            )
+        )
+
+        # 7. UPCOMING (or DONE if token live): TGE, Airdrop Claim & Governance
+        if not onchain.token_symbol:
+            milestones.append(
+                RoadmapMilestone(
+                    phase="Etapa 7 · TGE & Airdrop",
+                    title="Lançamento do Token (TGE), Claim & Listagens",
+                    status="UPCOMING",
+                    details="Token ainda não listado — monitoramento automático de docs/roadmap ativo para alertar anúncio de TGE, checker de elegibilidade e claim no Telegram.",
+                )
+            )
+        else:
+            milestones.append(
+                RoadmapMilestone(
+                    phase="Etapa 7 · Pós-TGE",
+                    title=f"Token {onchain.token_symbol} Ativo, Governança & Expansão",
+                    status="DONE",
+                    details=f"Token {onchain.token_symbol} já lançado no mercado. Foco em governança, staking e eventuais temporadas futuras (Season 2+).",
                 )
             )
 
