@@ -34,8 +34,12 @@ REGRAS DE VEREDITO:
 - Score 50 a 69 -> verdict = "WATCHLIST"
 - Score < 50 -> verdict = "REJECTED"
 
+REGRAS DO ROADMAP (roadmap_milestones):
+- Gere de 5 a 7 marcos reais e cronológicos ESPECÍFICOS deste protocolo (combinando o que já foi concluído com base nos dados reais, a fase atual em andamento e os próximos marcos reais encontrados nos docs/site/roadmap).
+- NUNCA use frases genéricas quando a documentação mencionar produtos, tokens, vaults, seasons, testnets ou upgrades concretos (ex: cite o nome real dos vaults, tokens sintéticos, bridges ou fases do protocolo).
+
 REGRAS DO PLANO ANTI-SYBIL (strategic_tasks):
-- SE fundamental_score >= 70: gere de 5 a 7 tarefas práticas, específicas para este protocolo, focadas em maximizar elegibilidade e evitar filtros Sybil (ex: manter saldo mínimo orgânico na mainnet, variar valores e dias da semana, usar bridge nativa, fornecer liquidez por > 14 dias, votar em governança, evitar transações repetitivas/dust no mesmo bloco).
+- SE fundamental_score >= 70: gere de 5 a 7 tarefas práticas, ESPECÍFICAS para os produtos/contratos reais deste protocolo (cite nomes reais de tokens, pools, vaults, bridges ou programas de pontos/referral encontrados no site/docs), focadas em maximizar elegibilidade e evitar filtros Sybil (ex: manter saldo mínimo orgânico na mainnet, variar valores e dias da semana, usar bridge nativa, fornecer liquidez por > 14 dias, votar em governança, evitar transações repetitivas/dust no mesmo bloco).
 - SE fundamental_score < 70: retorne strategic_tasks como lista vazia [] (não desperdice capital/tempo do usuário em projetos reprovados ou em observação).
 
 IDIOMA:
@@ -96,6 +100,9 @@ Existing Token Symbol: {onchain.token_symbol or 'None detected (potentially toke
 Verified Audits: {onchain.audits_count} ({', '.join(onchain.audit_links[:3]) if onchain.audit_links else 'No audit links indexed'})
 Historical Hacks / Exploits: {len(onchain.hacks_history)} ({'; '.join(f"{h.get('date')} ${h.get('amount_usd') or 0:,.0f} ({h.get('technique')})" for h in onchain.hacks_history[:3]) if onchain.hacks_history else 'None recorded'})
 Domain Age (RDAP): {f"{scraped.domain_age_days} days (registered {scraped.domain_created_at})" if scraped.domain_age_days is not None else 'Unknown'}
+Community Engagement: Discord={scraped.discord_members or 'N/A'} members ({scraped.discord_online or 'N/A'} online) | Telegram={scraped.telegram_members or 'N/A'} members
+Waitlist / Referral: waitlist={scraped.has_waitlist} ({scraped.waitlist_url or 'N/A'}) | referral={scraped.has_referral} ({scraped.referral_url or 'N/A'})
+Token Supply / FDV: total_supply={onchain.total_supply or 'N/A'} | circulating={onchain.circulating_supply or 'N/A'} | fdv={f"${onchain.fdv_usd:,.0f}" if onchain.fdv_usd else 'N/A'}
 Total Funding (USD): {f"${onchain.total_funding_usd:,.2f}" if onchain.total_funding_usd is not None else 'N/A'}
 Investors: {', '.join(onchain.investors[:15]) if onchain.investors else 'None indexed'}
 Funding Rounds:
