@@ -152,16 +152,44 @@ Notes: {' | '.join(onchain.source_notes)}
         from google.genai import types
 
         client = genai.Client(api_key=self.settings.gemini_api_key)
-        response = client.models.generate_content(
-            model=self.settings.gemini_model,
-            contents=prompt_context,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                response_mime_type="application/json",
-                response_schema=DueDiligenceReport,
-                temperature=0.2,
-            ),
+        candidate_models = list(
+            dict.fromkeys(
+                [
+                    self.settings.gemini_model,
+                    "gemini-flash-latest",
+                    "gemini-3-flash-preview",
+                    "gemini-2.5-flash-lite",
+                    "gemini-2.5-pro",
+                    "gemini-pro-latest",
+                ]
+            )
         )
+
+        last_exc: Exception | None = None
+        response = None
+        for model_name in candidate_models:
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt_context,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        response_mime_type="application/json",
+                        response_schema=DueDiligenceReport,
+                        temperature=0.2,
+                    ),
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                err_str = str(exc)
+                if "404" in err_str or "NOT_FOUND" in err_str or "no longer available" in err_str:
+                    logger.warning("Gemini model %s unavailable, trying next candidate...", model_name)
+                    continue
+                raise
+
+        if response is None:
+            raise last_exc or RuntimeError("No available Gemini model succeeded.")
 
         if getattr(response, "parsed", None) is not None:
             parsed = response.parsed
