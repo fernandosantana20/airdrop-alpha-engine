@@ -185,6 +185,125 @@ async def check_airdrop_platforms(
     return output
 
 
+async def fetch_galxe_space(project_name: str) -> Optional[Dict[str, Any]]:
+    """Query Galxe's free public GraphQL API to check if the project has an active Quest Space."""
+    if not project_name or len(project_name.strip()) < 3:
+        return None
+    query = (
+        "query($q: String!) { "
+        "spaces(input: { searchString: $q, first: 3 }) { "
+        "list { name alias followersCount activeCampaignCount } } }"
+    )
+    target_norm = re.sub(r"[^a-z0-9]", "", project_name.lower())
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.post(
+                "https://graphigo.prd.galaxy.eco/query",
+                json={"query": query, "variables": {"q": project_name}},
+                headers={"Content-Type": "application/json", "User-Agent": USER_AGENT},
+            )
+            if resp.status_code == 200:
+                spaces = (
+                    resp.json().get("data", {}).get("spaces", {}).get("list") or []
+                )
+                for sp in spaces:
+                    sp_name = str(sp.get("name") or "")
+                    sp_alias = str(sp.get("alias") or "")
+                    n_norm = re.sub(r"[^a-z0-9]", "", sp_name.lower())
+                    a_norm = re.sub(r"[^a-z0-9]", "", sp_alias.lower())
+                    if target_norm and (
+                        target_norm == n_norm
+                        or target_norm == a_norm
+                        or (len(target_norm) >= 4 and (target_norm in n_norm or n_norm in target_norm))
+                    ):
+                        return {
+                            "found": True,
+                            "name": sp_name,
+                            "alias": sp_alias,
+                            "followers": int(sp.get("followersCount") or 0),
+                            "active_campaigns": int(sp.get("activeCampaignCount") or 0),
+                            "url": f"https://app.galxe.com/quest/{sp_alias}",
+                        }
+    except Exception as exc:
+        logger.debug("Galxe GraphQL lookup skipped for %s: %s", project_name, exc)
+    return None
+
+
+def build_research_hub(
+    project_name: str,
+    galxe_space: Optional[Dict[str, Any]] = None,
+    layer3_url: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Build non-redundant, high-signal deep research & quest shortcuts (Galxe, Layer3, RootData, Dune)."""
+    q = quote_plus(project_name)
+    items: List[Dict[str, Any]] = []
+
+    if galxe_space and galxe_space.get("found"):
+        active = int(galxe_space.get("active_campaigns") or 0)
+        followers = int(galxe_space.get("followers") or 0)
+        badge = (
+            f"{active} quest(s) ativa(s)"
+            if active > 0
+            else f"{followers:,} seguidores"
+        )
+        items.append(
+            {
+                "name": "Galxe Quests",
+                "key": "galxe",
+                "role": "Quests",
+                "badge": badge,
+                "active": active > 0,
+                "url": galxe_space["url"],
+            }
+        )
+    else:
+        items.append(
+            {
+                "name": "Galxe Quests",
+                "key": "galxe",
+                "role": "Quests",
+                "badge": "Buscar",
+                "active": False,
+                "url": f"https://app.galxe.com/quest?search={q}",
+            }
+        )
+
+    items.append(
+        {
+            "name": "Layer3",
+            "key": "layer3",
+            "role": "Quests",
+            "badge": "Vinculado" if layer3_url else "Buscar",
+            "active": bool(layer3_url),
+            "url": layer3_url or f"https://app.layer3.xyz/quests?search={q}",
+        }
+    )
+
+    items.append(
+        {
+            "name": "RootData",
+            "key": "rootdata",
+            "role": "VCs & Time",
+            "badge": "Funding/Time",
+            "active": False,
+            "url": f"https://www.rootdata.com/search?q={q}",
+        }
+    )
+
+    items.append(
+        {
+            "name": "Dune",
+            "key": "dune",
+            "role": "On-Chain SQL",
+            "badge": "Dashboards",
+            "active": False,
+            "url": f"https://dune.com/browse/dashboards?q={q}",
+        }
+    )
+
+    return items
+
+
 # ---------------------------------------------------------------------------
 # Tokenomics Distribution Extractor (for Pie Chart)
 # ---------------------------------------------------------------------------

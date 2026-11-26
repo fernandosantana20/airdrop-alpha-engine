@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.services.airdrop_trackers import (
+    build_research_hub,
     extract_supply_from_text,
     extract_tokenomics_distribution,
 )
@@ -97,6 +98,7 @@ def build_deep_metrics(
     onchain: OnChainMetrics,
     fundamental_score: int,
     airdrop_platforms: Optional[List[Dict[str, Any]]] = None,
+    galxe_space: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     combined_text = f"{scraped.main_text} {scraped.docs_text} {scraped.roadmap_text}".lower()
 
@@ -508,6 +510,15 @@ def build_deep_metrics(
 
     platforms_list = airdrop_platforms or []
     ranked_platforms_count = sum(1 for p in platforms_list if p.get("listed") is True)
+    layer3_found = next(
+        (e["url"] for e in scraped.extra_links if "layer3.xyz" in e.get("url", "").lower()),
+        None,
+    )
+    research_hub = build_research_hub(
+        project_name=onchain.matched_protocol or scraped.inferred_name,
+        galxe_space=galxe_space,
+        layer3_url=layer3_found,
+    )
 
     return {
         "cost_model": cost_model,
@@ -543,6 +554,8 @@ def build_deep_metrics(
         "telegram_members": t_members,
         "airdrop_platforms": platforms_list,
         "ranked_platforms_count": ranked_platforms_count,
+        "galxe_space": galxe_space,
+        "research_hub": research_hub,
         "tokenomics": tokenomics,
         "airdrop_estimate": airdrop_estimate,
         "provenance_checks": checks,

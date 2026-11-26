@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpDown, Radar, Search, Send, X } from "lucide-react";
+import { ArrowUpDown, Radar, Search, Send, Wallet, X } from "lucide-react";
 import type {
   DashboardStats,
   HealthStatus,
@@ -14,6 +14,7 @@ import { DiscoverRadar } from "@/components/DiscoverRadar";
 import { ProjectCard } from "@/components/ProjectCard";
 import { ProjectDetailPanel } from "@/components/ProjectDetailPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { WalletCheckerModal } from "@/components/WalletCheckerModal";
 
 const VERDICT_TABS = [
   { id: "ALL", label: "Todos" },
@@ -38,6 +39,7 @@ export default function DashboardPage() {
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isRunningMonitor, setIsRunningMonitor] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const [banner, setBanner] = useState<{
     type: "error" | "success" | "info";
     text: string;
@@ -288,6 +290,15 @@ export default function DashboardPage() {
             )}
 
             <button
+              onClick={() => setShowWalletModal(true)}
+              title="Verificar saúde Anti-Sybil da sua carteira EVM"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas/80 px-2.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
+            >
+              <Wallet className="h-3.5 w-3.5 shrink-0" />
+              <span className="hidden sm:inline">Carteira</span>
+            </button>
+
+            <button
               onClick={handleTestTelegram}
               title="Testar alerta no Telegram"
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-canvas/80 px-2.5 text-xs text-fg-secondary transition hover:border-border-strong hover:text-fg"
@@ -507,6 +518,11 @@ export default function DashboardPage() {
           onCheckUpdates={handleCheckUpdates}
           onDelete={handleDeleteProject}
         />
+      )}
+
+      {/* On-Demand Anti-Sybil Wallet Health Modal */}
+      {showWalletModal && (
+        <WalletCheckerModal onClose={() => setShowWalletModal(false)} />
       )}
     </div>
   );

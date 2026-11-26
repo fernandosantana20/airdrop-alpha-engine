@@ -166,6 +166,10 @@ class UpdateTrackerRequest(BaseModel):
     investment_notes: str = Field(default="", max_length=2000)
 
 
+class WalletCheckRequest(BaseModel):
+    address: str = Field(..., min_length=42, max_length=42)
+
+
 class DiscoverProjectItem(BaseModel):
     name: str
     slug: str

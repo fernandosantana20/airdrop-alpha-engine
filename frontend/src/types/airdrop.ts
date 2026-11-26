@@ -37,6 +37,35 @@ export interface AirdropPlatformStatus {
   home_url: string;
 }
 
+export interface ResearchHubItem {
+  name: string;
+  key: string;
+  role: string;
+  badge: string;
+  active: boolean;
+  url: string;
+}
+
+export interface WalletChainStat {
+  chain: string;
+  symbol: string;
+  tx_count: number;
+  balance: number;
+  active: boolean;
+  ok: boolean;
+}
+
+export interface WalletCheckResult {
+  address: string;
+  sybil_score: number;
+  verdict: string;
+  total_transactions: number;
+  active_chains_count: number;
+  total_eth_balance: number;
+  chains: WalletChainStat[];
+  checks: ProvenanceCheck[];
+}
+
 export interface TokenomicsSlice {
   label: string;
   key: string;
@@ -95,6 +124,7 @@ export interface DeepMetrics {
   telegram_members?: number | null;
   airdrop_platforms?: AirdropPlatformStatus[];
   ranked_platforms_count?: number;
+  research_hub?: ResearchHubItem[];
   tokenomics?: TokenomicsData;
   airdrop_estimate?: AirdropEstimate;
   provenance_checks?: ProvenanceCheck[];

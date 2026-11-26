@@ -6,6 +6,7 @@ import type {
   MonitorCheckResult,
   ProjectDetail,
   ProjectListItem,
+  WalletCheckResult,
 } from "@/types/airdrop";
 
 function getApiBase(): string {
@@ -160,6 +161,12 @@ export const api = {
   testTelegram: () =>
     request<{ sent: boolean; reason: string }>("/api/notifications/test", {
       method: "POST",
+    }),
+
+  checkWallet: (address: string) =>
+    request<WalletCheckResult>("/api/wallet/check", {
+      method: "POST",
+      body: JSON.stringify({ address }),
     }),
 };
 

@@ -548,6 +548,41 @@ export function ProjectDetailPanel({
                 Clique em reanalisar (↻) no topo para verificar este projeto nas 5 plataformas de mineração de airdrops.
               </p>
             )}
+
+            {/* Unified Deep Research & Active Quests Strip (Galxe, Layer3, RootData, Dune) */}
+            {project.deep_metrics?.research_hub &&
+              project.deep_metrics.research_hub.length > 0 && (
+                <div className="mt-4 border-t border-border pt-3.5">
+                  <p className="text-[11px] font-medium text-fg-muted">
+                    Quests Abertas &amp; Pesquisa Profunda
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-1.5">
+                    {project.deep_metrics.research_hub.map((item) => (
+                      <a
+                        key={item.key}
+                        href={item.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between gap-2 rounded-lg border border-border bg-canvas px-2.5 py-1.5 text-xs transition hover:border-border-strong hover:bg-elevated"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-fg">{item.name}</p>
+                          <p
+                            className={`truncate text-[10px] ${
+                              item.active
+                                ? "font-medium text-emerald-600 dark:text-emerald-400"
+                                : "text-fg-muted"
+                            }`}
+                          >
+                            {item.badge}
+                          </p>
+                        </div>
+                        <ExternalLink className="h-3 w-3 shrink-0 text-fg-muted" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
           </section>
         </div>
 

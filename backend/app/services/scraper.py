@@ -376,7 +376,7 @@ class Web3Scraper:
                 ("Mirror", "blog", lambda u: "mirror.xyz" in u),
                 ("Blog", "blog", lambda u: "/blog" in u or "blog." in u),
                 ("Governance / Snapshot", "governance", lambda u: "snapshot.org" in u or "tally.xyz" in u),
-                ("Galxe / Guild", "community", lambda u: "galxe.com" in u or "guild.xyz" in u or "zealy.io" in u),
+                ("Galxe / Guild / Layer3", "community", lambda u: "galxe.com" in u or "guild.xyz" in u or "zealy.io" in u or "layer3.xyz" in u),
             ):
                 if match_fn(lower_url) and full_url not in seen_extra:
                     seen_extra.add(full_url)

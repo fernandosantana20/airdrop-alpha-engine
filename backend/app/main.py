@@ -26,14 +26,16 @@ from app.schemas import (
     TaskToggleRequest,
     UpdateReferralRequest,
     UpdateTrackerRequest,
+    WalletCheckRequest,
 )
 from app.services.ai_analyzer import AIDueDiligenceAnalyzer
-from app.services.airdrop_trackers import check_airdrop_platforms
+from app.services.airdrop_trackers import check_airdrop_platforms, fetch_galxe_space
 from app.services.deep_research import build_deep_metrics
 from app.services.monitor import RoadmapMonitor
 from app.services.notifier import TelegramNotifier
 from app.services.onchain_data import DefiLlamaClient
 from app.services.scraper import Web3Scraper, normalize_url
+from app.services.wallet_checker import check_wallet_anti_sybil
 
 logging.basicConfig(
     level=logging.INFO,
@@ -267,12 +269,13 @@ async def analyze_project(
     # 3. Run AI Due Diligence (Gemini Structured Outputs or heuristic fallback)
     report, analysis_mode = await analyzer.analyze(scraped, onchain)
 
-    # 4. Check ranking/listing on the 5 major airdrop hunting platforms
+    # 4. Check ranking on the 5 airdrop platforms + Galxe active quests in parallel
     resolved_slug = onchain.slug or _slugify(report.project_name)
     airdrop_platforms = await check_airdrop_platforms(
         project_name=report.project_name,
         slug=resolved_slug,
     )
+    galxe_space = await fetch_galxe_space(report.project_name)
 
     now = datetime.now(timezone.utc)
     if existing:
@@ -353,6 +356,7 @@ async def analyze_project(
         onchain=onchain,
         fundamental_score=report.fundamental_score,
         airdrop_platforms=airdrop_platforms,
+        galxe_space=galxe_space,
     )
     project.executive_summary = report.executive_summary
     project.bull_case = report.bull_case
@@ -516,3 +520,11 @@ def toggle_task(
 async def test_telegram_notification() -> dict:
     notifier = TelegramNotifier()
     return await notifier.send_test_alert()
+
+
+@app.post("/api/wallet/check")
+async def check_wallet_health(payload: WalletCheckRequest) -> dict:
+    try:
+        return await check_wallet_anti_sybil(payload.address)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
