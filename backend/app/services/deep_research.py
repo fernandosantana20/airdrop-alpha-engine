@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from app.services.airdrop_trackers import extract_tokenomics_distribution
 from app.services.onchain_data import OnChainMetrics
 from app.services.scraper import ScrapedProjectData
 
@@ -92,6 +93,7 @@ def build_deep_metrics(
     scraped: ScrapedProjectData,
     onchain: OnChainMetrics,
     fundamental_score: int,
+    airdrop_platforms: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     combined_text = f"{scraped.main_text} {scraped.docs_text} {scraped.roadmap_text}".lower()
 
@@ -417,6 +419,13 @@ def build_deep_metrics(
             f"{'histórico de hack/exploit registrado ou ' if hacks_count > 0 else ''}fundamentos insuficientes ou assimetria reduzida."
         )
 
+    tokenomics = extract_tokenomics_distribution(
+        f"{scraped.roadmap_text}\n{scraped.docs_text}\n{scraped.main_text}",
+        is_tokenless=is_tokenless,
+    )
+    platforms_list = airdrop_platforms or []
+    ranked_platforms_count = sum(1 for p in platforms_list if p.get("listed") is True)
+
     return {
         "cost_model": cost_model,
         "cost_model_label": cost_model_label,
@@ -443,5 +452,8 @@ def build_deep_metrics(
         "discord_online": d_online,
         "discord_online_pct": d_online_pct,
         "telegram_members": t_members,
+        "airdrop_platforms": platforms_list,
+        "ranked_platforms_count": ranked_platforms_count,
+        "tokenomics": tokenomics,
         "provenance_checks": checks,
     }

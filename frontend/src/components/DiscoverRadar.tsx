@@ -29,6 +29,14 @@ const CHAIN_FILTERS = [
   "Sui",
 ] as const;
 
+const TOP_AIRDROP_PLATFORMS = [
+  { name: "CryptoRank", url: "https://cryptorank.io/drophunting" },
+  { name: "DropsTab", url: "https://dropstab.com/activities" },
+  { name: "Alpha Drops", url: "https://alphadrops.net/" },
+  { name: "DappRadar", url: "https://dappradar.com/" },
+  { name: "Airdrops.io", url: "https://airdrops.io/" },
+] as const;
+
 export function DiscoverRadar({ onAnalyzeUrl }: DiscoverRadarProps) {
   const [items, setItems] = useState<DiscoverProjectItem[]>([]);
   const [chain, setChain] = useState<string>("ALL");
@@ -91,6 +99,23 @@ export function DiscoverRadar({ onAnalyzeUrl }: DiscoverRadarProps) {
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Atualizar
           </button>
+        </div>
+
+        {/* Top 5 Airdrop Hunting Platforms Quick Links */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
+          <span className="mr-1 text-[11px] text-fg-muted">Fontes Top 5:</span>
+          {TOP_AIRDROP_PLATFORMS.map((p) => (
+            <a
+              key={p.name}
+              href={p.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-canvas px-2 py-0.5 text-[11px] text-fg-secondary transition hover:border-border-strong hover:text-fg"
+            >
+              {p.name}
+              <ExternalLink className="h-2.5 w-2.5" />
+            </a>
+          ))}
         </div>
 
         <div className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">

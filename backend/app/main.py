@@ -28,6 +28,7 @@ from app.schemas import (
     UpdateTrackerRequest,
 )
 from app.services.ai_analyzer import AIDueDiligenceAnalyzer
+from app.services.airdrop_trackers import check_airdrop_platforms
 from app.services.deep_research import build_deep_metrics
 from app.services.monitor import RoadmapMonitor
 from app.services.notifier import TelegramNotifier
@@ -264,6 +265,13 @@ async def analyze_project(
     # 3. Run AI Due Diligence (Gemini Structured Outputs or heuristic fallback)
     report, analysis_mode = await analyzer.analyze(scraped, onchain)
 
+    # 4. Check ranking/listing on the 5 major airdrop hunting platforms
+    resolved_slug = onchain.slug or _slugify(report.project_name)
+    airdrop_platforms = await check_airdrop_platforms(
+        project_name=report.project_name,
+        slug=resolved_slug,
+    )
+
     now = datetime.now(timezone.utc)
     if existing:
         project = existing
@@ -342,6 +350,7 @@ async def analyze_project(
         scraped=scraped,
         onchain=onchain,
         fundamental_score=report.fundamental_score,
+        airdrop_platforms=airdrop_platforms,
     )
     project.executive_summary = report.executive_summary
     project.bull_case = report.bull_case

@@ -27,6 +27,29 @@ export interface HackIncident {
   technique?: string;
 }
 
+export interface AirdropPlatformStatus {
+  platform: string;
+  key: string;
+  listed: boolean | null;
+  status_label: string;
+  url: string;
+  search_url: string;
+  home_url: string;
+}
+
+export interface TokenomicsSlice {
+  label: string;
+  key: string;
+  percentage: number;
+  color: string;
+}
+
+export interface TokenomicsData {
+  source: string;
+  source_label: string;
+  slices: TokenomicsSlice[];
+}
+
 export interface DeepMetrics {
   cost_model?: "FREE_TESTNET" | "CAPITAL_REQUIRED" | "HYBRID" | string;
   cost_model_label?: string;
@@ -53,6 +76,9 @@ export interface DeepMetrics {
   discord_online?: number | null;
   discord_online_pct?: number | null;
   telegram_members?: number | null;
+  airdrop_platforms?: AirdropPlatformStatus[];
+  ranked_platforms_count?: number;
+  tokenomics?: TokenomicsData;
   provenance_checks?: ProvenanceCheck[];
 }
 

@@ -27,6 +27,7 @@ import type { EcosystemLink, MonitorCheckResult, ProjectDetail } from "@/types/a
 import { formatRelativeDate, formatUsd } from "@/lib/api";
 import { ScoreRing } from "./ScoreRing";
 import { ThemeToggle } from "./ThemeToggle";
+import { TokenomicsPieChart } from "./TokenomicsPieChart";
 
 interface ProjectDetailPanelProps {
   project: ProjectDetail;
@@ -489,6 +490,69 @@ export function ProjectDetailPanel({
             </div>
           </div>
         </section>
+
+        {/* Top Analytics Row: Tokenomics Pie Chart + 5 Airdrop Hunting Platforms */}
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <TokenomicsPieChart
+            tokenomics={project.deep_metrics?.tokenomics}
+            tokenSymbol={project.deep_metrics?.token_symbol}
+          />
+
+          <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-muted">
+                  Ranking em Plataformas de Airdrop
+                </h3>
+                <p className="mt-0.5 text-[11px] text-fg-muted">
+                  CryptoRank · DropsTab · Alpha Drops · DappRadar · Airdrops.io
+                </p>
+              </div>
+              <span className="rounded-md border border-border bg-canvas px-2 py-0.5 font-mono-code text-[11px] font-semibold text-fg">
+                {project.deep_metrics?.ranked_platforms_count ?? 0}/5 confirmados
+              </span>
+            </div>
+
+            {project.deep_metrics?.airdrop_platforms &&
+            project.deep_metrics.airdrop_platforms.length > 0 ? (
+              <div className="mt-3.5 space-y-2">
+                {project.deep_metrics.airdrop_platforms.map((plat) => {
+                  const badgeStyle =
+                    plat.listed === true
+                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+                      : plat.listed === false
+                      ? "bg-elevated text-fg-muted"
+                      : "bg-amber-500/15 text-amber-700 dark:text-amber-400";
+                  return (
+                    <a
+                      key={plat.key}
+                      href={plat.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-canvas px-3 py-2 text-xs transition hover:border-border-strong hover:bg-elevated"
+                    >
+                      <span className="truncate font-medium text-fg">
+                        {plat.platform}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span
+                          className={`rounded px-2 py-0.5 text-[10px] font-semibold ${badgeStyle}`}
+                        >
+                          {plat.status_label}
+                        </span>
+                        <ExternalLink className="h-3.5 w-3.5 text-fg-muted" />
+                      </span>
+                    </a>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-fg-muted">
+                Clique em reanalisar (↻) no topo para verificar este projeto nas 5 plataformas de mineração de airdrops.
+              </p>
+            )}
+          </section>
+        </div>
 
         {/* Responsive 2-Column Layout on Desktop, Stacked on Mobile */}
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
