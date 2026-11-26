@@ -134,9 +134,10 @@ def get_dashboard_stats(db: Session = Depends(get_db)) -> DashboardStatsResponse
 @app.get("/api/discover", response_model=List[DiscoverProjectItem])
 async def discover_projects(
     min_tvl: float = Query(default=100_000, ge=0),
-    max_tvl: float = Query(default=150_000_000, ge=0),
+    max_tvl: float = Query(default=1_000_000_000, ge=0),
     chain: Optional[str] = Query(default=None),
     search: Optional[str] = Query(default=None),
+    sort: str = Query(default="profitability"),
     limit: int = Query(default=24, ge=1, le=60),
     db: Session = Depends(get_db),
 ) -> List[DiscoverProjectItem]:
@@ -146,6 +147,7 @@ async def discover_projects(
         max_tvl=max_tvl,
         chain=chain,
         search=search,
+        sort=sort,
         limit=limit,
     )
     existing_slugs = {

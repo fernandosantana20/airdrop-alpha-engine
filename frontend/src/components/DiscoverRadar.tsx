@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
+  ArrowUpDown,
   Check,
   ExternalLink,
   Layers,
@@ -37,9 +38,23 @@ const TOP_AIRDROP_PLATFORMS = [
   { name: "Airdrops.io", url: "https://airdrops.io/" },
 ] as const;
 
+function formatListedDate(ts?: number | null): string | null {
+  if (!ts) return null;
+  const d = new Date(ts * 1000);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short",
+    year: "2-digit",
+  }).format(d);
+}
+
 export function DiscoverRadar({ onAnalyzeUrl }: DiscoverRadarProps) {
   const [items, setItems] = useState<DiscoverProjectItem[]>([]);
   const [chain, setChain] = useState<string>("ALL");
+  const [sortBy, setSortBy] = useState<
+    "profitability" | "tvl_desc" | "newest" | "growth_7d"
+  >("profitability");
   const [search, setSearch] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [analyzingSlug, setAnalyzingSlug] = useState<string | null>(null);
@@ -52,8 +67,9 @@ export function DiscoverRadar({ onAnalyzeUrl }: DiscoverRadarProps) {
       const data = await api.discover({
         chain,
         search,
+        sort: sortBy,
         min_tvl: 100_000,
-        max_tvl: 150_000_000,
+        max_tvl: 1_000_000_000,
         limit: 24,
       });
       setItems(data);
@@ -62,7 +78,7 @@ export function DiscoverRadar({ onAnalyzeUrl }: DiscoverRadarProps) {
     } finally {
       setLoading(false);
     }
-  }, [chain, search]);
+  }, [chain, search, sortBy]);
 
   useEffect(() => {
     loadGems();
@@ -118,8 +134,8 @@ export function DiscoverRadar({ onAnalyzeUrl }: DiscoverRadarProps) {
           ))}
         </div>
 
-        <div className="mt-3 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+        <div className="mt-3 flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="no-scrollbar flex items-center gap-1 overflow-x-auto pb-1 lg:pb-0">
             {CHAIN_FILTERS.map((ch) => (
               <button
                 key={ch}
@@ -135,15 +151,32 @@ export function DiscoverRadar({ onAnalyzeUrl }: DiscoverRadarProps) {
             ))}
           </div>
 
-          <div className="relative w-full sm:w-60">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filtrar radar..."
-              className="w-full rounded-lg border border-border bg-canvas py-1.5 pl-8 pr-3 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
-            />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative flex items-center">
+              <ArrowUpDown className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-fg-muted" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                aria-label="Ordenar radar"
+                className="w-full sm:w-auto appearance-none rounded-lg border border-border bg-canvas py-1.5 pl-8 pr-7 text-base sm:text-xs text-fg focus:border-border-strong focus:outline-none"
+              >
+                <option value="profitability">Mais Rentável / Probabilidade</option>
+                <option value="tvl_desc">Maior TVL</option>
+                <option value="newest">Último Lançamento</option>
+                <option value="growth_7d">Maior Crescimento (7d)</option>
+              </select>
+            </div>
+
+            <div className="relative w-full sm:w-56">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filtrar radar..."
+                className="w-full rounded-lg border border-border bg-canvas py-1.5 pl-8 pr-3 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -179,21 +212,31 @@ export function DiscoverRadar({ onAnalyzeUrl }: DiscoverRadarProps) {
                         {item.name}
                       </h3>
                       <p className="mt-0.5 truncate text-xs text-fg-muted">
-                        {item.category} · Tokenless
+                        {item.category}
+                        {formatListedDate(item.listed_at)
+                          ? ` · ${formatListedDate(item.listed_at)}`
+                          : " · Tokenless"}
                       </p>
                     </div>
-                    {item.tvl_change_7d !== null && (
-                      <span
-                        className={`shrink-0 rounded px-1.5 py-0.5 font-mono-code text-[11px] font-medium ${
-                          item.tvl_change_7d >= 0
-                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                            : "bg-rose-500/15 text-rose-700 dark:text-rose-400"
-                        }`}
-                      >
-                        {item.tvl_change_7d >= 0 ? "+" : ""}
-                        {item.tvl_change_7d.toFixed(1)}% 7d
-                      </span>
-                    )}
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {item.alpha_score != null && (
+                        <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono-code text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                          Alpha {item.alpha_score}
+                        </span>
+                      )}
+                      {item.tvl_change_7d !== null && (
+                        <span
+                          className={`font-mono-code text-[10px] font-medium ${
+                            item.tvl_change_7d >= 0
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-rose-600 dark:text-rose-400"
+                          }`}
+                        >
+                          {item.tvl_change_7d >= 0 ? "+" : ""}
+                          {item.tvl_change_7d.toFixed(1)}% 7d
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center gap-1.5">

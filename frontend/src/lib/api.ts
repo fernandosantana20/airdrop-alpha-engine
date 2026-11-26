@@ -131,6 +131,7 @@ export const api = {
   discover: (params?: {
     chain?: string;
     search?: string;
+    sort?: string;
     min_tvl?: number;
     max_tvl?: number;
     limit?: number;
@@ -138,6 +139,7 @@ export const api = {
     const qs = new URLSearchParams();
     if (params?.chain && params.chain !== "ALL") qs.set("chain", params.chain);
     if (params?.search?.trim()) qs.set("search", params.search.trim());
+    if (params?.sort) qs.set("sort", params.sort);
     if (params?.min_tvl !== undefined) qs.set("min_tvl", String(params.min_tvl));
     if (params?.max_tvl !== undefined) qs.set("max_tvl", String(params.max_tvl));
     if (params?.limit !== undefined) qs.set("limit", String(params.limit));

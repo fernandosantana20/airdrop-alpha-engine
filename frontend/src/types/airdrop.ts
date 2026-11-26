@@ -109,6 +109,8 @@ export interface DiscoverProjectItem {
   tvl_usd: number;
   tvl_change_7d: number | null;
   twitter_url: string | null;
+  listed_at?: number | null;
+  alpha_score?: number;
   already_analyzed: boolean;
 }
 

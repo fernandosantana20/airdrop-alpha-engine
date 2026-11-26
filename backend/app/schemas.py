@@ -175,6 +175,8 @@ class DiscoverProjectItem(BaseModel):
     tvl_usd: float
     tvl_change_7d: Optional[float] = None
     twitter_url: Optional[str] = None
+    listed_at: Optional[int] = None
+    alpha_score: int = 50
     already_analyzed: bool = False
 
 

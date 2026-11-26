@@ -373,9 +373,10 @@ class DefiLlamaClient:
     async def discover_tokenless_gems(
         self,
         min_tvl: float = 100_000,
-        max_tvl: float = 150_000_000,
+        max_tvl: float = 1_000_000_000,
         chain: Optional[str] = None,
         search: Optional[str] = None,
+        sort: str = "profitability",
         limit: int = 24,
     ) -> List[Dict[str, Any]]:
         """Discover emerging, lesser-known, tokenless Web3 protocols from DefiLlama."""
@@ -383,9 +384,28 @@ class DefiLlamaClient:
         if not isinstance(protocols, list):
             return []
 
-        excluded_categories = {"CEX", "Chain", "Bridge"}
+        excluded_categories = {"CEX", "Chain"}
+        high_alpha_categories = {
+            "derivatives",
+            "perp",
+            "dexes",
+            "dexs",
+            "lending",
+            "restaking",
+            "liquid restaking",
+            "liquid staking",
+            "yield",
+            "basis trading",
+            "cdp",
+            "rwa",
+            "bridge",
+        }
         chain_needle = chain.strip().lower() if chain else ""
         search_needle = search.strip().lower() if search else ""
+        now_ts = time.time()
+
+        # When user explicitly wants biggest TVL, don't cap at $150M
+        effective_max_tvl = max(max_tvl, 50_000_000_000) if sort == "tvl_desc" else max_tvl
 
         candidates: List[Dict[str, Any]] = []
         for p in protocols:
@@ -402,7 +422,7 @@ class DefiLlamaClient:
             except (TypeError, ValueError):
                 continue
 
-            if tvl_f < min_tvl or tvl_f > max_tvl:
+            if tvl_f < min_tvl or tvl_f > effective_max_tvl:
                 continue
 
             category = str(p.get("category") or "DeFi")
@@ -428,6 +448,45 @@ class DefiLlamaClient:
             c7d = p.get("change_7d")
             c7d_f = float(c7d) if isinstance(c7d, (int, float)) else None
             twitter = p.get("twitter")
+            listed_raw = p.get("listedAt")
+            listed_ts = int(listed_raw) if isinstance(listed_raw, (int, float)) and listed_raw > 0 else None
+
+            # Compute Alpha Profitability / Airdrop Probability Score (0-100)
+            alpha = 35
+            # Sweet-spot TVL: proven traction without extreme whale dilution
+            if 5_000_000 <= tvl_f <= 150_000_000:
+                alpha += 25
+            elif 1_000_000 <= tvl_f < 5_000_000 or 150_000_000 < tvl_f <= 500_000_000:
+                alpha += 18
+            elif tvl_f > 500_000_000:
+                alpha += 12
+            else:
+                alpha += 8
+
+            # Positive 7d inflow momentum
+            if c7d_f is not None:
+                if c7d_f >= 25:
+                    alpha += 18
+                elif c7d_f >= 5:
+                    alpha += 12
+                elif c7d_f > 0:
+                    alpha += 6
+                elif c7d_f < -20:
+                    alpha -= 8
+
+            # Sector historically rewarding airdrops
+            if category.lower() in high_alpha_categories:
+                alpha += 10
+
+            # Freshness / recency bonus
+            if listed_ts:
+                age_days = max(0, (now_ts - listed_ts) / 86400.0)
+                if age_days <= 90:
+                    alpha += 12
+                elif age_days <= 240:
+                    alpha += 6
+
+            alpha_score = max(10, min(99, int(alpha)))
 
             candidates.append(
                 {
@@ -439,15 +498,35 @@ class DefiLlamaClient:
                     "tvl_usd": round(tvl_f, 2),
                     "tvl_change_7d": round(c7d_f, 2) if c7d_f is not None else None,
                     "twitter_url": f"https://x.com/{twitter}" if twitter else None,
+                    "listed_at": listed_ts,
+                    "alpha_score": alpha_score,
                 }
             )
 
-        # Rank emerging gems by positive 7d growth first, then TVL
-        candidates.sort(
-            key=lambda item: (
-                item["tvl_change_7d"] if item["tvl_change_7d"] is not None else -9999.0,
-                item["tvl_usd"],
-            ),
-            reverse=True,
-        )
+        if sort == "tvl_desc":
+            candidates.sort(key=lambda item: item["tvl_usd"], reverse=True)
+        elif sort == "newest":
+            candidates.sort(
+                key=lambda item: (item["listed_at"] or 0, item["tvl_usd"]),
+                reverse=True,
+            )
+        elif sort == "growth_7d":
+            candidates.sort(
+                key=lambda item: (
+                    item["tvl_change_7d"] if item["tvl_change_7d"] is not None else -9999.0,
+                    item["tvl_usd"],
+                ),
+                reverse=True,
+            )
+        else:
+            # Default: profitability / highest airdrop probability
+            candidates.sort(
+                key=lambda item: (
+                    item["alpha_score"],
+                    item["tvl_change_7d"] if item["tvl_change_7d"] is not None else -9999.0,
+                    item["tvl_usd"],
+                ),
+                reverse=True,
+            )
+
         return candidates[: max(1, min(limit, 60))]
