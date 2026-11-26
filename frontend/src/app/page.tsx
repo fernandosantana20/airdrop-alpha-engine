@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Radar, Search, Send, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowUpDown, Radar, Search, Send, X } from "lucide-react";
 import type {
   DashboardStats,
   HealthStatus,
@@ -31,6 +31,9 @@ export default function DashboardPage() {
 
   const [activeView, setActiveView] = useState<"portfolio" | "discover">("portfolio");
   const [verdictFilter, setVerdictFilter] = useState<string>("ALL");
+  const [sortBy, setSortBy] = useState<
+    "priority" | "date_desc" | "date_asc" | "name_asc" | "name_desc" | "tvl_desc"
+  >("priority");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -173,9 +176,42 @@ export default function DashboardPage() {
 
   const handleDeleteProject = async (id: number) => {
     await api.deleteProject(id);
-    setSelectedProject(null);
+    if (selectedProject?.id === id) {
+      setSelectedProject(null);
+    }
+    setBanner({ type: "info", text: "Projeto removido da sua lista." });
     await loadData();
   };
+
+  const sortedProjects = useMemo(() => {
+    const list = [...projects];
+    switch (sortBy) {
+      case "date_desc":
+        return list.sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      case "date_asc":
+        return list.sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      case "name_asc":
+        return list.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      case "name_desc":
+        return list.sort((a, b) => b.name.localeCompare(a.name, "pt-BR"));
+      case "tvl_desc":
+        return list.sort((a, b) => (b.tvl_usd ?? -1) - (a.tvl_usd ?? -1));
+      case "priority":
+      default:
+        return list.sort((a, b) => {
+          if (b.fundamental_score !== a.fundamental_score) {
+            return b.fundamental_score - a.fundamental_score;
+          }
+          return (b.tvl_usd ?? 0) - (a.tvl_usd ?? 0);
+        });
+    }
+  }, [projects, sortBy]);
 
   const handleRunAllMonitors = async () => {
     setIsRunningMonitor(true);
@@ -404,31 +440,51 @@ export default function DashboardPage() {
                 ))}
               </div>
 
-              <div className="relative w-full sm:w-64">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar projeto ou rede..."
-                  className="w-full rounded-lg border border-border bg-surface py-2 pl-8 pr-3 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
-                />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative flex items-center">
+                  <ArrowUpDown className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-fg-muted" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                    aria-label="Ordenar projetos"
+                    className="w-full sm:w-auto appearance-none rounded-lg border border-border bg-surface py-2 pl-8 pr-7 text-base sm:text-xs text-fg focus:border-border-strong focus:outline-none"
+                  >
+                    <option value="priority">Prioridade (Score)</option>
+                    <option value="date_desc">Data (Mais recentes)</option>
+                    <option value="date_asc">Data (Mais antigos)</option>
+                    <option value="name_asc">Nome (A → Z)</option>
+                    <option value="name_desc">Nome (Z → A)</option>
+                    <option value="tvl_desc">Maior TVL</option>
+                  </select>
+                </div>
+
+                <div className="relative w-full sm:w-56">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-muted" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar projeto ou rede..."
+                    className="w-full rounded-lg border border-border bg-surface py-2 pl-8 pr-3 text-base sm:text-xs text-fg placeholder:text-fg-muted focus:border-border-strong focus:outline-none"
+                  />
+                </div>
               </div>
             </section>
 
             {/* Responsive Grid */}
             <section className="mt-4">
-              {projects.length === 0 ? (
+              {sortedProjects.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-fg-muted">
                   Nenhum projeto encontrado. Cole a URL de um protocolo acima ou abra &ldquo;Descobrir Alpha&rdquo;.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {projects.map((proj) => (
+                  {sortedProjects.map((proj) => (
                     <ProjectCard
                       key={proj.id}
                       project={proj}
                       onSelect={handleSelectProject}
+                      onDelete={handleDeleteProject}
                     />
                   ))}
                 </div>

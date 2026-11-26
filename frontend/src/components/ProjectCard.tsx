@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import {
   BookOpen,
   Globe,
   Instagram,
   Layers,
+  Loader2,
   Send,
+  Trash2,
 } from "lucide-react";
 import type { ProjectListItem } from "@/types/airdrop";
 import { formatUsd } from "@/lib/api";
@@ -13,9 +16,23 @@ import { formatUsd } from "@/lib/api";
 interface ProjectCardProps {
   project: ProjectListItem;
   onSelect: (id: number) => void;
+  onDelete: (id: number) => Promise<void>;
 }
 
-export function ProjectCard({ project, onSelect }: ProjectCardProps) {
+export function ProjectCard({ project, onSelect, onDelete }: ProjectCardProps) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleConfirmDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleting(true);
+    try {
+      await onDelete(project.id);
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  };
   const dotColor =
     project.verdict === "APPROVED"
       ? "bg-emerald-500 dark:bg-emerald-400"
@@ -185,6 +202,44 @@ export function ProjectCard({ project, onSelect }: ProjectCardProps) {
             >
               <BookOpen className="h-3.5 w-3.5" />
             </a>
+          )}
+
+          <span className="mx-0.5 h-3 w-px bg-border" />
+
+          {confirmingDelete ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-rose-500 disabled:opacity-50"
+              >
+                {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Apagar"}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmingDelete(false);
+                }}
+                className="rounded border border-border bg-canvas px-1.5 py-0.5 text-[10px] text-fg-secondary hover:text-fg"
+              >
+                Não
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmingDelete(true);
+              }}
+              title="Apagar projeto"
+              aria-label={`Apagar ${project.name}`}
+              className="rounded p-1 text-fg-muted transition hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
           )}
         </div>
       </div>
